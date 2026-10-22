@@ -4,6 +4,8 @@ A local-first research pipeline for extracting **dense spatial representations o
 
 **Repository:** https://github.com/arpitmisra/mini-project
 
+**First run on a Mac:** follow the [ordered Mac runbook](docs/MAC_RUNBOOK.md). It gives the exact commands, expected results, a no-dataset test route, dense-feature export, cache-reuse checks, optional classification and the full-data run in execution order.
+
 Start with **Apple Silicon Mac: setup and smoke test** below. The GitHub repository contains source, configuration, documentation and tests. The large OCT dataset, local Python environment, downloaded model weights and generated outputs are excluded; the pipeline uses existing local data or downloads through KaggleHub when explicitly enabled by the full-run configuration.
 
 The entry point is **`run_pipeline.py`**. See the [detailed repository walkthrough](docs/REPOSITORY_GUIDE.md) for every component, the exact output files, and how the implementation maps to the requested architecture.
