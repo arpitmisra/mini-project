@@ -97,6 +97,7 @@ def test_real_pretrained_extractor():
     assert batch["cls"].shape == (2, 384)
     assert batch["patches"].shape == (2, 256, 384)
     np.testing.assert_allclose(batch["cls"][:1], single["cls"], atol=5e-4, rtol=1e-3)
+    np.testing.assert_allclose(batch["patches"][:1], single["patches"], atol=5e-4, rtol=1e-3)
 
 
 @pytest.mark.pretrained
@@ -111,6 +112,9 @@ def test_pretrained_end_to_end_and_cache_reuse(oct_root, tmp_path, monkeypatch):
     first = pipeline.run(config)
     assert first["count"] == 4
     assert (tmp_path / "run/checkpoints/best_classifier.safetensors").is_file()
+    from oct_dinov2_mlx.representations import export_dense_sample
+    metadata = export_dense_sample(tmp_path / "run/features_manifest.json", tmp_path / "dense.npz")
+    assert metadata["arrays"]["spatial_grid"]["shape"] == [16, 16, 384]
     monkeypatch.setattr(pipeline, "DINOv2Extractor", lambda *_: pytest.fail("Cache reuse reloaded backbone"))
     second = pipeline.run(config)
     assert second["count"] == 4

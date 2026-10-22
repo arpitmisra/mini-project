@@ -121,16 +121,19 @@ class FeatureCache:
         if verify:
             offset = 0
             for entry in self.index["shards"]:
-                expected = []
-                for record in self.index["records"][offset:offset + entry["count"]]:
-                    item = {k: v for k, v in record.items() if k != "image_path"}
-                    if item.get("sha256"):
-                        item.pop("mtime_ns")
-                    expected.append(item)
-                shard = self.path.parent / entry["file"]
-                if not validate_shard(shard, self.path.parent / entry["metadata"], self.index["identity"], expected):
-                    raise ValueError(f"Corrupt or stale feature shard: {shard}. Rerun extraction to repair it.")
+                self._verify_entry(entry, offset)
                 offset += entry["count"]
+
+    def _verify_entry(self, entry, offset):
+        expected = []
+        for record in self.index["records"][offset:offset + entry["count"]]:
+            item = {k: v for k, v in record.items() if k != "image_path"}
+            if item.get("sha256"):
+                item.pop("mtime_ns")
+            expected.append(item)
+        shard = self.path.parent / entry["file"]
+        if not validate_shard(shard, self.path.parent / entry["metadata"], self.index["identity"], expected):
+            raise ValueError(f"Corrupt or stale feature shard: {shard}. Rerun extraction to repair it.")
 
     def load_cls(self):
         # Dense spatial tensors are never concatenated across the dataset.
@@ -141,11 +144,21 @@ class FeatureCache:
                 ys.append(data["labels"])
         return np.concatenate(xs), np.concatenate(ys)
 
-    def load_sample(self, sample_id):
+    def load_sample(self, sample_id, verify=False):
+        # Locate by the index before opening arrays. Dense exports only need the
+        # selected shard, not a scan of every multi-GB split cache.
+        position = next((i for i, r in enumerate(self.index["records"]) if r["sample_id"] == sample_id), None)
+        if position is None:
+            raise KeyError(sample_id)
+        offset = 0
         for entry in self.index["shards"]:
-            with np.load(self.path.parent / entry["file"], allow_pickle=False) as data:
-                ids = data["sample_ids"].tolist()
-                if sample_id in ids:
-                    i = ids.index(sample_id)
+            if offset <= position < offset + entry["count"]:
+                if verify:
+                    self._verify_entry(entry, offset)
+                with np.load(self.path.parent / entry["file"], allow_pickle=False) as data:
+                    i = position - offset
+                    if str(data["sample_ids"][i]) != sample_id:
+                        raise ValueError("Sample order differs from feature index; rerun extraction")
                     return {key: data[key][i] for key in data.files}
+            offset += entry["count"]
         raise KeyError(sample_id)

@@ -2,6 +2,22 @@
 
 Development host: Windows 11 AMD64, Python 3.14.5. Date: 19 October 2026 (Asia/Calcutta).
 
+## Dense representation review — 22 October 2026
+
+The requested diagram was checked against the source, including token shapes, pretrained weight loading, normalization, patch ordering, preprocessing geometry, cache persistence and the separate classifier branch. The actual pinned MLX-VLM wheel confirms row-major patch flattening and separate final normalized CLS/patch outputs.
+
+The full configuration previously saved CLS only. Both configurations now persist dense patch features by default. A portable export utility writes a scan's complete CLS vector, patch matrix, spatial grid, crop-relative patch coordinates, labels and provenance. It verifies only the selected shard, avoiding a full dense-cache scan for one export. Existing CLS-only caches require new extraction to obtain spatial features; their data are not overwritten.
+
+Executed for this revision:
+
+- `python -m pytest -q --tb=short`: **49 passed, 1 skipped in 24.72 seconds**. The skipped item remains the native MLX module.
+- New tests check exact cached/exported values, float16 persistence, row/column orientation, crop bounds, handling of missing/CLS-only samples, overwrite refusal, selected-shard corruption detection and the export CLI from another working directory. These use explicitly synthetic feature arrays, not real pretrained outputs.
+- Syntax compilation and `git diff --check` passed.
+- Real local `--stage inspect --offline` passed for 48 selected OCT images, writing its record to `outputs/dense-review-inspect/portable_smoke.json`. No full image-processing or download run was performed.
+- Mac pretrained tests were extended to check patch batch consistency and export a dense sample after the integration run. These additional native checks have not been executed here.
+
+The README and `REPOSITORY_GUIDE.md` now distinguish the dense deliverable, optional CLS-based classification, crop coverage, float16 rounding, exact output files and the remaining native/scientific validation requirements. No real OCT feature values or classification performance are claimed from these portable checks.
+
 ## Handoff review — 22 October 2026
 
 The source was reviewed again before the first GitHub publication. The final local regression run for this review completed with **42 passed, 1 skipped in 19.82 seconds**. The skipped item is the complete native MLX test module. Syntax compilation and the real local 48-image inspection smoke test also passed again. No full dataset was downloaded or processed.

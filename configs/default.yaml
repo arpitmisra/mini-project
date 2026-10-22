@@ -18,7 +18,7 @@ features:
   cache_dir: outputs/features
   batch_size: 8
   shard_size: 128
-  save_patches: false
+  save_patches: true
   patch_dtype: float16
 training:
   epochs: 30

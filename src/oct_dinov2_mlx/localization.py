@@ -10,9 +10,19 @@ class Localizer(Protocol):
         ...
 
 
+def patches_to_grid(patches, image_size=224):
+    """Row-major tokens -> [row, column, channel] on the preprocessed crop."""
+    if type(image_size) is not int or image_size < 14 or image_size % 14:
+        raise ValueError("image_size must be a positive multiple of 14")
+    side = image_size // 14
+    patches = np.asarray(patches)
+    if patches.shape != (side * side, 384):
+        raise ValueError(f"Expected patches [{side * side},384], received {patches.shape}")
+    return patches.reshape(side, side, 384)
+
+
 def spatial_grid(cache, sample_id):
     sample = cache.load_sample(sample_id)
     if "patches" not in sample:
         raise ValueError("This cache contains CLS only; extract with features.save_patches=true")
-    side = cache.index["identity"]["preprocessing"]["image_size"] // 14
-    return sample["patches"].reshape(side, side, 384)
+    return patches_to_grid(sample["patches"], cache.index["identity"]["preprocessing"]["image_size"])
