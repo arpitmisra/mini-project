@@ -1,0 +1,32 @@
+dataset:
+  local_path: data/OCT2017
+  allow_download: false
+  handle: paultimothymooney/kermany2018
+  version: null
+  max_per_class: 4
+  validation_fraction: null
+  hash_images: true
+model:
+  repo_id: facebook/dinov2-small
+  revision: ed25f3a31f01632728cabb09d1542f84ab7b0056
+  local_path: null
+  allow_download: true
+preprocessing:
+  image_size: 224
+  resize_shortest: 256
+features:
+  cache_dir: outputs/features
+  batch_size: 2
+  shard_size: 8
+  save_patches: true
+  patch_dtype: float16
+training:
+  epochs: 3
+  batch_size: 8
+  learning_rate: 0.001
+  weight_decay: 0.01
+  weighted_loss: true
+  patience: 3
+runtime:
+  seed: 42
+  output_dir: outputs/smoke

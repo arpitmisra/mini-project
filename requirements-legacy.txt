@@ -1,0 +1,8 @@
+# Dependencies of the preserved, earlier PyTorch prototypes only.
+torch
+torchvision
+pillow
+numpy
+matplotlib
+scikit-learn
+tqdm

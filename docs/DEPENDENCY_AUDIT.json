@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-22",
+  "target": "CPython 3.12 / macosx_14_0_arm64",
+  "operation": "pip install --dry-run --ignore-installed --only-binary=:all:",
+  "status": "resolution passed",
+  "resolved_package_count": 78,
+  "selected_versions": {
+    "mlx": "0.32.4",
+    "mlx-metal": "0.32.4",
+    "mlx-vlm": "0.7.6",
+    "numpy": "2.5.4",
+    "pillow": "13.0.0",
+    "scikit-learn": "1.9.1",
+    "matplotlib": "3.11.2",
+    "huggingface_hub": "2.2.0",
+    "kagglehub": "1.0.3",
+    "pytest": "9.1.1",
+    "transformers": "5.20.2"
+  },
+  "metal_explicitly_requested": true,
+  "packages_installed": false,
+  "native_runtime_executed": false,
+  "limitations": [
+    "Cross-platform pip may evaluate some environment markers on the Windows host.",
+    "This report is a dependency availability check, not a lockfile or proof of native MLX execution."
+  ]
+}

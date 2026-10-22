@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-19",
+  "repo_id": "facebook/dinov2-small",
+  "revision": "ed25f3a31f01632728cabb09d1542f84ab7b0056",
+  "file": "model.safetensors",
+  "published_file_size_bytes": 88249960,
+  "published_lfs_sha256": "ae1e99fcefd534ed978cdeb8326f08030c96e28b7a81ffcbc98a857c84d14be1",
+  "header_request": "Range: bytes=0-65535",
+  "http_status": 206,
+  "response_bytes_read": 65536,
+  "safetensors_header_bytes": 23648,
+  "tensor_count": 223,
+  "parameter_count": 22056576,
+  "dtype_set": ["F32"],
+  "strict_key_and_shape_validation": "passed against expected_hf_shapes()",
+  "full_weights_downloaded": false,
+  "forward_pass_executed": false,
+  "full_file_sha256_locally_verified": false,
+  "note": "Published LFS checksum will be verified against the complete file when the Mac loads the checkpoint. Header agreement is not numerical parity."
+}

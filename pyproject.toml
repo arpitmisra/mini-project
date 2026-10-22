@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oct-dinov2-mlx"
+version = "0.1.0"
+description = "Local-first frozen DINOv2 features and MLX retinal OCT classification"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26", "Pillow>=10.3", "PyYAML>=6", "scikit-learn>=1.4", "matplotlib>=3.8", "huggingface-hub>=0.26", "kagglehub>=0.3.13"]
+
+[project.optional-dependencies]
+mac = ["mlx>=0.32.2,<0.33", "mlx-vlm==0.7.6"]
+test = ["pytest>=8"]
+parity = ["torch>=2.4", "transformers>=5.14.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["mlx: requires native Apple Silicon MLX", "pretrained: explicitly enabled pretrained model integration tests"]
