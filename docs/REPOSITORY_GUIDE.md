@@ -2,6 +2,8 @@
 
 The current objective is **fine-tune DINOv2 on OCT training images, then generate dense representations only**. It replaces the earlier frozen-backbone plus linear-classifier workflow. The current entry point never trains a diagnostic classifier and has no classification evaluation/prediction stages.
 
+Use `python oct.py run "/path/to/OCT2017"` followed by `python oct.py show` for the small check. Add `--full` to both for the full experiment. The [README](../README.md) contains the complete setup, ordered commands and file/output tables. `oct.py` delegates to the same pipeline described here; `run_pipeline.py` remains available for advanced stage/config control.
+
 ## Execution flow
 
 1. Resolve an existing local Kermany dataset; use KaggleHub fallback only when enabled and the local path is absent.
@@ -26,12 +28,14 @@ Extraction uses RGB conversion, bicubic shortest-edge resize to 256, center crop
 
 | File | Role |
 |---|---|
+| `oct.py` | Simple `run` and `show` entry point |
 | `run_pipeline.py` | Main CLI entry point |
 | `configs/default.yaml` | Full-data adaptation/extraction settings |
 | `configs/smoke_test.yaml` | 48-image selection, one epoch capped at two updates, no dataset download |
 | `requirements.txt` | Portable dependencies plus conditional native Mac dependencies |
 | `pyproject.toml` | Package metadata, dependency groups and test configuration |
 | `src/oct_dinov2_mlx/__init__.py` | Package initialization/version |
+| `cli.py` | Smoke/full command routing and verified, reusable single-scan export/display |
 | `config.py` | Configuration merge, path precedence and strict value checks |
 | `common.py` | Hashes, JSON writes, system information and native platform checks |
 | `data.py` | Local/KaggleHub resolution, records, lazy images and split integrity |
@@ -56,6 +60,7 @@ Module names after `__init__.py` in the table refer to `src/oct_dinov2_mlx/` unl
 | File | Role |
 |---|---|
 | `tests/conftest.py` | Artificial dataset fixture |
+| `test_cli.py` | Simple command routing, bounded defaults, offline/path behavior and errors |
 | `test_data.py` | Local/fallback behavior, labels, transforms and split integrity |
 | `test_cache.py` | Reuse, corruption repair, invalidation, interruption and locks |
 | `test_dense_representation.py` | Export values, dtypes, spatial order and coordinates |
@@ -101,8 +106,10 @@ outputs/smoke-adapted/
   extraction_config.resolved.json  # when extract is run separately
   extraction_dataset_summary.json # preserves the training dataset summary
   extraction_metadata.json        # when extract is run separately
-  dense_sample.npz                # when export_dense is invoked
+  dense_sample.npz                # when oct.py show is invoked (or explicitly exported)
   dense_sample.json
+  samples/<sample-key>.npz        # when show --sample-id is used
+  samples/<sample-key>.json
 outputs/features/<adapted-identity>/<split>/
   index-<selection>.json
   <shard-hash>.npz

@@ -116,3 +116,46 @@ def test_spatial_grid_rejects_incompatible_shape():
         patches_to_grid(np.zeros((257, 384)))  # CLS must not become a spatial token.
     with pytest.raises(ValueError, match="multiple of 14"):
         patches_to_grid(np.zeros((256, 384)), image_size=225)
+
+
+def test_simple_show_exports_reuses_and_detects_damage(dense_run, monkeypatch, capsys):
+    from oct_dinov2_mlx import cli
+    manifest, _, _ = dense_run
+    output = cli.show(manifest.parent)
+    before = output.stat().st_mtime_ns
+    printed = capsys.readouterr().out
+    assert "shape=(16, 16, 384)" in printed
+    assert "All values are saved" in printed
+    monkeypatch.setattr(cli, "export_dense_sample", lambda *_: pytest.fail("Repeated show must reuse export"))
+    cli.show(manifest.parent)
+    assert output.stat().st_mtime_ns == before
+    output.write_bytes(b"damaged export")
+    with pytest.raises(ValueError, match="corrupt"):
+        cli.show(manifest.parent)
+
+
+def test_simple_show_selects_another_scan_and_rejects_stale_export(dense_run):
+    from oct_dinov2_mlx.cli import show
+    manifest, _, data = dense_run
+    first = show(manifest.parent)
+    selected = show(manifest.parent, sample_id=data.records[-1].sample_id)
+    assert selected != first
+    with np.load(selected, allow_pickle=False) as saved:
+        assert str(saved["sample_id"]) == data.records[-1].sample_id
+    sidecar = first.with_suffix(".json")
+    metadata = json.loads(sidecar.read_text(encoding="utf-8"))
+    metadata["feature_identity"] = {"wrong": "identity"}
+    write_json(sidecar, metadata)
+    with pytest.raises(ValueError, match="does not match"):
+        show(manifest.parent)
+
+
+def test_simple_show_cli_works_from_other_directory_without_images(dense_run, tmp_path):
+    manifest, _, data = dense_run
+    for record in data.records:
+        Path(record.image_path).unlink()
+    result = subprocess.run([sys.executable, str(ROOT / "oct.py"), "show", "--output-dir", str(manifest.parent)],
+                            cwd=tmp_path, text=True, capture_output=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+    assert "spatial_grid: shape=(16, 16, 384)" in result.stdout
+    assert (manifest.parent / "dense_sample.npz").is_file()

@@ -1,147 +1,113 @@
-# Mac runbook: fine-tuning followed by dense representations only
+# Mac checklist: adapt DINOv2, then save dense representations
 
-Run Terminal commands from the repository root. Use an Apple Silicon Mac with native arm64 Python, preferably 3.12. The project requires macOS 14 or newer; installed MLX wheels can impose a newer minimum. Stop on failed tests before starting a full experiment.
+The [README](../README.md) is the complete guide, including every project file, result location and troubleshooting. This page gives the commands in order. Run them from the cloned repository, using native arm64 Python on a compatible Apple Silicon Mac.
 
-## 1. Clone and install once
+## 1. One-time installation
 
 ```bash
-git clone --recurse-submodules https://github.com/arpitmisra/mini-project.git
+git clone https://github.com/arpitmisra/mini-project.git
 cd mini-project
 python3 -c "import platform; print(platform.machine())"
-# Confirm arm64.
+```
+
+Confirm `arm64`, then:
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m pip check
-python run_pipeline.py --stage system
 ```
 
-For an existing clone, use `git pull --ff-only`, activate the environment, and reinstall requirements. Native model stages check the platform before dataset/model retrieval.
+Python 3.12 is the documented target. Use macOS 14 or newer, subject to the installed MLX wheel's minimum. For an existing clone, activate its environment, pull updates with `git pull --ff-only`, and reinstall requirements.
 
-## 2. Check native execution
+## 2. Test the installation
 
 ```bash
 python -m pytest -q
 OCT_TEST_PRETRAINED=1 python -m pytest -q -m pretrained
 ```
 
-Ordinary tests execute native synthetic gradient/loss/EMA/checkpoint/resume checks on the Mac, with two pretrained tests skipped. The opt-in command runs those two tests using actual pinned weights (~89 MB first download), including tiny backbone fine-tuning, dense export and reuse. No OCT dataset download is performed by these tests.
+Stop if tests fail. The first command includes native gradient/loss/EMA/resume tests on a compatible Mac. The second enables actual pretrained integration tests, including tiny adaptation, dense export and reuse. It may download the pinned model (~89 MB), but neither command downloads the OCT dataset. Test images are artificial.
 
-Optionally verify the original pretrained adapter against the reference:
+## 3. Run a small check on local OCT images
 
-```bash
-python -m pip install -e '.[parity]'
-python scripts/verify_parity.py
-```
-
-Both CLS and patches should report `passed: true`; results go to `outputs/parity.json`. This compares the original initialization, not an adapted model to different original weights. Add `--image "/path/to/scan.jpeg"` for an actual OCT-image comparison.
-
-## 3. Inspect local data without training or downloading
+Replace the path with the actual folder containing train/val/test:
 
 ```bash
-export OCT_DATASET_PATH="/absolute/path/to/OCT2017"
-python run_pipeline.py --config configs/smoke_test.yaml --stage inspect --offline
+python oct.py run "$HOME/Downloads/OCT2017"
 ```
 
-Expected: 16 selected images per split, 48 total. This checks only the selected images' hashes/pixels. The full directory can be counted without decoding all images. Dataset folders must include train/val/test and the four original diagnoses.
+This selects at most 48 scans, trains on TRAIN only for two updates, then extracts dense features. It never downloads the dataset. The two-update result verifies software behavior; it is not a research-quality adaptation experiment.
 
-## 4. Run the requested workflow with one command
+## 4. See and export the arrays
 
 ```bash
-python run_pipeline.py --config configs/smoke_test.yaml
+python oct.py show
 ```
 
-This fine-tunes on original TRAIN images only (one epoch capped at two steps), freezes the final EMA teacher, then extracts dense features for the 48 selected images. No classifier or classification metrics are produced. No dataset download is allowed. Model weights can be fetched once if needed.
+Expected shapes: `cls (384,)`, `patches (256,384)`, `spatial_grid (16,16,384)`.
 
-Outputs:
+The command prints the source scan and file locations and creates:
 
-- `outputs/smoke-adapted/finetuning/backbone.safetensors` and `.json`: adapted EMA backbone, with no SSL projection heads.
-- `outputs/smoke-adapted/finetuning/epoch-0001/`: resumable training state.
-- `outputs/smoke-adapted/finetuning/history.json`: self-supervised training diagnostics.
-- `outputs/smoke-adapted/features_manifest.json`: links to the split feature indices.
-- `outputs/features/<adapted-identity>/`: CLS/patch shards and sample metadata.
+```text
+outputs/smoke-adapted/dense_sample.npz
+outputs/smoke-adapted/dense_sample.json
+```
 
-If no OCT data is available, test with explicitly artificial images instead:
+Every value is stored. To see all values in Terminal, use `python oct.py show --all-values`. Repeating `show` reuses the verified export without model execution.
+
+## 5. Check reuse
 
 ```bash
-python scripts/create_synthetic_smoke.py
-python run_pipeline.py --config configs/smoke_test.yaml --dataset-path outputs/synthetic-smoke-data --output-dir outputs/artificial-adaptation
+python oct.py run "$HOME/Downloads/OCT2017" --offline
 ```
 
-Do not treat this artificial run as OCT research. The generator refuses to overwrite an existing fixture; reuse it if already created. Subsequent real-data commands must use the real dataset, not this fixture.
+With unchanged settings/data and a completed first run, the adapted checkpoint is reused. Expect `extracted 0, reused 16` for each split when the smoke selection contains 48 scans. Hash/cache checks still read files.
 
-## 5. Export and display the dense arrays
+## 6. Run the full experiment
+
+After the tests and smoke run pass:
 
 ```bash
-python scripts/export_dense.py --feature-manifest outputs/smoke-adapted/features_manifest.json --split test --output outputs/smoke-adapted/dense_sample.npz
-python - <<'PY_ARRAYS'
-import numpy as np
-with np.load("outputs/smoke-adapted/dense_sample.npz", allow_pickle=False) as scan:
-    print("Image:", scan["sample_id"])
-    print("Patches:", scan["patches"].shape)
-    print(scan["patches"])
-    print("Spatial grid:", scan["spatial_grid"].shape)
-    print(scan["spatial_grid"])
-    print("One full descriptor:", scan["spatial_grid"][7, 11])
-PY_ARRAYS
+python oct.py run "$HOME/Downloads/OCT2017" --full
+python oct.py show --full
 ```
 
-Expected shapes: patches `(256,384)`, grid `(16,16,384)`; CLS `(384,)` is also saved. Large printed arrays are abbreviated by NumPy; the file retains every value. The spatial coordinates describe the preprocessed center crop. Use a new export filename when repeating the command. Add `--sample-id` with an exact ID from the split index for another image. For the artificial run, use `outputs/artificial-adaptation` in these paths.
+This uses all training images for five adaptation epochs, then extracts train/val/test features. Results use `outputs/oct-adapted/`; the single-scan export is `outputs/oct-adapted/dense_sample.npz`. Five epochs is a starting setting, not a validated optimum.
 
-## 6. Verify reuse or run stages separately
+If no local dataset exists and you deliberately want the full KaggleHub download, use `python oct.py run --full`. It tries `OCT_DATASET_PATH` or the configured local directory first. Full mode permits KaggleHub fallback if that path is unavailable. Allow dataset/archive space, approximately 15.5 GiB for float16 patches at 84,484 scans, and additional space for training checkpoints.
 
-Rerun the same full command offline:
+For a tiny artificial Mac run before downloading OCT data, see the README's optional commands. Never report artificial features as OCT results.
+
+## 7. Find or share all results
+
+- `outputs/<run>/features_manifest.json`: links to the split indices.
+- `outputs/features/<adapted-identity>/<split>/`: all cached arrays and image records.
+- `outputs/<run>/finetuning/backbone.safetensors` and `backbone.json`: adapted EMA backbone and provenance.
+- `outputs/<run>/finetuning/history.json`: self-supervised diagnostics.
+- `outputs/<run>/finetuning/epoch-XXXX/`: resumable training states.
+- `outputs/<run>/dense_sample.npz/.json`: one scan exported by `show`.
+
+Here `<run>` is `smoke-adapted` or `oct-adapted`. The README lists every additional metadata file. Copy the entire `outputs/` layout to preserve manifest links. To share just one representation, send the single-scan export pair.
+
+## 8. Resume or start a different experiment
+
+After interruption, rerun the same command. Training resumes after the last complete epoch; incomplete epochs are replayed. Feature extraction reuses valid shards. Investigate any stale writer lock before removing it.
+
+Changed training settings/data require a new run directory:
 
 ```bash
-python run_pipeline.py --config configs/smoke_test.yaml --offline
+python oct.py run "$HOME/Downloads/OCT2017" --full --output-dir outputs/experiment-02
+python oct.py show --full --output-dir outputs/experiment-02
 ```
 
-Expected: a message that the completed adapted backbone is reused, followed by `extracted 0, reused 16` for each split. No repeated optimization or feature inference is needed. File integrity checks still run.
-
-To run only one part:
+In a new Terminal, return to the repository and reactivate the environment:
 
 ```bash
-python run_pipeline.py --config configs/smoke_test.yaml --stage finetune
-python run_pipeline.py --config configs/smoke_test.yaml --stage extract --offline
+cd "/absolute/path/to/mini-project"
+source .venv/bin/activate
 ```
 
-Extraction requires the adapted checkpoint from a completed fine-tuning run. For a different completed model, use `--stage extract --checkpoint "/path/to/backbone.safetensors"`; keep the matching JSON beside it. The pipeline does not fall back silently to pretrained-only extraction.
-
-## 7. Run the full real dataset after the checks pass
-
-```bash
-export OCT_DATASET_PATH="/absolute/path/to/real/OCT2017"
-python run_pipeline.py --config configs/default.yaml
-```
-
-This performs five fine-tuning epochs over training images and then extracts all splits. Full outputs use `outputs/oct-adapted/`. Configure epochs, batch size and learning rate before starting; five epochs is an unvalidated starting setting.
-
-If the dataset is not present and automatic KaggleHub retrieval is desired:
-
-```bash
-unset OCT_DATASET_PATH
-python run_pipeline.py --config configs/default.yaml
-```
-
-The command uses local `data/OCT2017` if available, otherwise downloads/extracts the full Kermany dataset. It is intentionally not a smoke command. Follow the README's authentication instructions if requested. Allow dataset/archive space, about 15.5 GiB for float16 patch arrays at the indexed size, and additional space for epoch/optimizer checkpoints. Float32 patches double patch storage.
-
-After the full run, replace `outputs/smoke-adapted` with `outputs/oct-adapted` in step 5 to inspect its features. Save the environment:
-
-```bash
-python -m pip freeze > outputs/requirements-used.txt
-```
-
-## 8. Resume or change experiments
-
-After interruption, rerun the same command/config/output directory. Fine-tuning resumes after the last fully saved epoch; an incomplete epoch is repeated. Once adaptation completes, feature extraction resumes from valid completed shards. If a stale lock is reported, verify no writer is active before removing only that lock.
-
-Changing training settings, seed, epochs or selected training records requires a new output directory:
-
-```bash
-python run_pipeline.py --config configs/default.yaml --output-dir outputs/oct-adapted-experiment-02
-```
-
-In a new Terminal session, return to the repository, run `source .venv/bin/activate`, and set the real `OCT_DATASET_PATH` again. The former classifier commands (`train`, `evaluate`, `predict`) no longer exist in the main pipeline.
-
-Native fine-tuning and actual representation quality still require verification on the Mac. A low self-supervised training loss does not establish good OCT representations or clinical performance.
+Native fine-tuning has not been executed on the Windows development host. Successful optimization does not establish representation quality or clinical performance. The output is a learned patch-feature tensor in the preprocessed crop, not a segmentation or class prediction.

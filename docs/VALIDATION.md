@@ -1,4 +1,14 @@
-# Current validation: self-supervised adaptation — 25 October 2026
+# Simple run/show commands — 25 October 2026
+
+The professor-facing workflow now uses `python oct.py run "/path/to/OCT2017"` and `python oct.py show`. The wrapper delegates adaptation/extraction to the existing pipeline. Smoke selection remains bounded; only `--full` selects the full experiment and permits dataset fallback. Viewing exports one scan without MLX or original images and checks the export's identity/checksum before reuse.
+
+Executed on Windows: **73 passed, 2 skipped in 26.15 seconds**. The two skips remain whole native MLX modules. New checks cover smoke/full dispatch, paths with spaces, environment path precedence, offline mode, actionable errors, repeat viewing without rewriting, corrupted/stale exports, choosing a different scan, and running the viewer from another working directory after original fixture images are removed. These tests use synthetic arrays; no real adapted representations are claimed.
+
+The README now provides the ordered install/test/smoke/view/full flow, every project file's purpose and exact output locations. The compact Mac runbook uses the same commands. Native execution still requires the Mac tests below.
+
+---
+
+# Self-supervised adaptation validation — 25 October 2026
 
 The active flow changed to native MLX teacher–student fine-tuning on original training images, then adapted dense extraction only. Classifier stages and active classifier/evaluation modules were removed. The final EMA backbone has its own checksum and complete provenance, and the dense cache includes that adapted identity.
 
