@@ -20,13 +20,24 @@ features:
   shard_size: 8
   save_patches: true
   patch_dtype: float16
-training:
-  epochs: 3
-  batch_size: 8
-  learning_rate: 0.001
-  weight_decay: 0.01
-  weighted_loss: true
-  patience: 3
+finetuning:
+  epochs: 1
+  batch_size: 2
+  learning_rate: 0.00001
+  weight_decay: 0.04
+  teacher_momentum: 0.996
+  center_momentum: 0.9
+  student_temperature: 0.1
+  teacher_temperature: 0.07
+  mask_ratio: 0.4
+  global_loss_weight: 1.0
+  patch_loss_weight: 1.0
+  head_hidden_dim: 64
+  head_bottleneck_dim: 32
+  prototypes: 64
+  gradient_clip: 3.0
+  augmentation_strength: 0.2
+  max_steps_per_epoch: 2
 runtime:
   seed: 42
-  output_dir: outputs/smoke
+  output_dir: outputs/smoke-adapted

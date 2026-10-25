@@ -1,3 +1,11 @@
+# Current method — 25 October 2026
+
+The active pipeline now performs self-supervised teacher–student OCT adaptation followed by dense extraction only. See [FINETUNING.md](FINETUNING.md) for the exact global/masked-patch objective, EMA/centering, train-only data protocol, checkpoint format and differences from full DINOv2 pretraining. No classifier is trained by the current entry point.
+
+The pinned original checkpoint, MLX-VLM implementation, weight-schema conversion and deterministic extraction preprocessing investigated below remain the initialization/extraction foundation. Final features now come from the adapted EMA teacher, with a distinct weight checksum. The earlier classifier/API investigation below is retained as **historical context**, not current execution instructions.
+
+---
+
 # Implementation investigation — 19 October 2026
 
 The technical sources below were inspected during implementation. None of the upstream authors' test claims are treated as locally executed results.

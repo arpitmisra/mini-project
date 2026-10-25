@@ -1,3 +1,32 @@
+# Current validation: self-supervised adaptation — 25 October 2026
+
+The active flow changed to native MLX teacher–student fine-tuning on original training images, then adapted dense extraction only. Classifier stages and active classifier/evaluation modules were removed. The final EMA backbone has its own checksum and complete provenance, and the dense cache includes that adapted identity.
+
+Executed on Windows 11 AMD64 / Python 3.14.5:
+
+- Portable regression suite: **63 passed, 2 skipped in 25.06 seconds**. Both skipped items are whole native MLX test modules. Fixtures and mocked model outputs are explicitly artificial, not real DINOv2 representations.
+- Covered new train-only eligibility, immutable training contracts, adapted weight/contract checksum validation, cache identity changes across adapted models, deterministic aligned augmentation, bounded patch masks, missing-adaptation rejection before dataset access, bounded/offline inspection through the Python API, default fine-tune-then-extract routing, reuse without another extractor, and preservation of prior run metadata when an incompatible fine-tuning request is rejected.
+- Syntax compilation and CLI help checks passed. The CLI now exposes only `all`, `finetune`, `extract`, `inspect` and `system`.
+- Real local offline inspection passed with **48 decoded images total** (16 per split). Record: `outputs/adaptation-review-inspect/portable_smoke.json`. Full directory counts were enumerated, but no full-data image processing or dataset/model download occurred.
+- A first test attempt could not create pytest's sandbox temporary directory. Tests were rerun with a fresh temporary directory inside ignored workspace `outputs/`. One regression then exposed a mutable settings reference in the training contract; it was fixed with a deep snapshot before the passing run.
+
+Source/API review used the already downloaded pinned MLX-VLM/MLX wheels, including masked `forward_features`, recursive unfreeze/freeze, native save/load, optimizer state and tree flatten/unflatten. The global and patch distillation design was checked against Meta's primary DINOv2 loss/architecture sources. This is API/source review, not native training execution.
+
+Provided but **not executed on this Windows host**:
+
+- Native masked-loss/cross-view math against a NumPy reference, backbone parameter updates, teacher EMA and stop-gradient assertions.
+- Full student/teacher/head/optimizer/center/RNG epoch-state save/restore through the next optimizer step.
+- Actual pretrained fine-tuning, final EMA backbone strict save/reload, adapted loading without original HF weights, dense export and repeated-run reuse.
+- Base-model numerical parity on the Mac. This checks initialization only; no full fine-tuning-procedure parity with an independent implementation is claimed.
+
+No successful native fine-tuning run, real adapted OCT features, improved representation quality, throughput or clinical performance is claimed. The Mac test instructions are in `MAC_RUNBOOK.md`. Full dataset leakage/patient-independence and representation-quality studies remain separate research work.
+
+---
+
+# Historical validation records (superseded workflow)
+
+The records below describe earlier frozen-backbone/linear-probe versions. Their classifier tests and commands are not the current pipeline.
+
 # Validation record
 
 Development host: Windows 11 AMD64, Python 3.14.5. Date: 19 October 2026 (Asia/Calcutta).

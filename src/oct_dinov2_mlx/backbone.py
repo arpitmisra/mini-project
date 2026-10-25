@@ -19,8 +19,7 @@ MLX_VLM_VERSION = "0.7.6"
 def model_identity(config):
     if config["repo_id"] != MODEL_REPO or config["revision"] != MODEL_REVISION:
         raise ValueError("Only the verified pinned facebook/dinov2-small checkpoint is supported. Add architecture/coverage/parity tests before changing it.")
-    # Identity is available offline without touching weights: cached head experiments
-    # must work even when the model cache or original image directory has been removed.
+    # Base identity is available offline, without touching pretrained weights.
     return {"repo_id": MODEL_REPO, "revision": MODEL_REVISION, "weights_sha256": MODEL_SHA256, "architecture": "dinov2_vits14", "embedding_dim": 384, "patch_size": 14, "register_tokens": 0, "implementation": f"mlx-vlm=={MLX_VLM_VERSION}", "adapter_version": 1, "compute_dtype": "float32"}
 
 
@@ -80,27 +79,45 @@ def checkpoint_files(config):
     return paths
 
 
+def check_native_implementation():
+    require_mlx()
+    try:
+        installed_version = version("mlx-vlm")
+    except PackageNotFoundError as exc:
+        raise RuntimeError(f"MLX-VLM is missing. Install requirements.txt (requires mlx-vlm=={MLX_VLM_VERSION}).") from exc
+    if installed_version != MLX_VLM_VERSION:
+        raise RuntimeError(f"Install mlx-vlm=={MLX_VLM_VERSION}; cache identity requires the audited implementation.")
+
+
+def native_model(hf_config):
+    check_native_implementation()
+    from mlx_vlm.models.dinov2.config import ModelConfig
+    from mlx_vlm.models.dinov2.dinov2 import Model
+    validate_hf_config(hf_config)
+    allowed = {f.name for f in fields(ModelConfig)}
+    return Model(ModelConfig(**{k: v for k, v in hf_config.items() if k in allowed}))
+
+
 class DINOv2Extractor:
-    def __init__(self, config, image_size=224):
-        require_mlx()
-        try:
-            installed_version = version("mlx-vlm")
-        except PackageNotFoundError as exc:
-            raise RuntimeError(f"MLX-VLM is missing. Install requirements.txt (requires mlx-vlm=={MLX_VLM_VERSION}).") from exc
-        if installed_version != MLX_VLM_VERSION:
-            raise RuntimeError(f"Install mlx-vlm=={MLX_VLM_VERSION}; cache identity requires the audited implementation.")
+    def __init__(self, config, image_size=224, checkpoint=None):
+        check_native_implementation()  # Fail before fetching weights for a broken setup.
         import mlx.core as mx
         from mlx.utils import tree_flatten
-        from mlx_vlm.models.dinov2.config import ModelConfig
-        from mlx_vlm.models.dinov2.dinov2 import Model
-        paths = checkpoint_files(config)
-        hf_config = json.loads(paths["config.json"].read_text(encoding="utf-8"))
-        validate_hf_config(hf_config)
-        allowed = {f.name for f in fields(ModelConfig)}
-        self.model = Model(ModelConfig(**{k: v for k, v in hf_config.items() if k in allowed}))
-        weights = mx.load(str(paths["model.safetensors"]))
-        validate_shapes(weights, expected_hf_shapes())
-        sanitized = self.model.sanitize(weights)
+        if checkpoint is None:
+            paths = checkpoint_files(config)
+            self.hf_config = json.loads(paths["config.json"].read_text(encoding="utf-8"))
+            self.model = native_model(self.hf_config)
+            weights = mx.load(str(paths["model.safetensors"]))
+            validate_shapes(weights, expected_hf_shapes())
+            sanitized = self.model.sanitize(weights)
+            identity = model_identity(config)
+        else:
+            from .adaptation import adapted_identity, read_adapted_checkpoint
+            meta = read_adapted_checkpoint(checkpoint, config)
+            self.hf_config = meta["hf_config"]
+            self.model = native_model(self.hf_config)
+            sanitized = mx.load(str(checkpoint))
+            identity = adapted_identity(checkpoint, config)
         expected = {k: tuple(v.shape) for k, v in tree_flatten(self.model.parameters())}
         validate_shapes(sanitized, expected)
         self.model.load_weights(list(sanitized.items()), strict=True)
@@ -108,7 +125,7 @@ class DINOv2Extractor:
         self.model.eval()
         mx.eval(self.model.parameters())
         self.image_size = image_size
-        self.metadata = {**model_identity(config), "tensor_count_source": len(weights), "tensor_count_mlx": len(sanitized)}
+        self.metadata = {**identity, "tensor_count_mlx": len(sanitized)}
 
     def extract(self, images):
         import mlx.core as mx
@@ -122,5 +139,5 @@ class DINOv2Extractor:
         if cls.shape != (len(images), 384) or patches.shape != (len(images), count, 384):
             raise ValueError(f"Invalid DINOv2 output shapes: {cls.shape}, {patches.shape}")
         if not np.isfinite(cls).all() or not np.isfinite(patches).all() or np.std(cls) == 0 or np.std(patches) == 0:
-            raise ValueError("Nonfinite or trivial pretrained representations")
+            raise ValueError("Nonfinite or trivial DINOv2 representations")
         return {"cls": cls, "patches": patches, "embedding_dimension": 384, "patch_grid": [self.image_size // 14] * 2, "patch_size": 14, "model_name": "dinov2_vits14"}

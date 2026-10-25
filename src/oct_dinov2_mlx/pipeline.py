@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
 
@@ -14,12 +15,13 @@ from .cache import FeatureCache, extract_cached, feature_identity
 from .common import require_mlx, system_info, write_json
 from .config import ROOT, load_config
 from .data import KermanyOCTDataset, Record, check_split_integrity, derive_validation, resolve_dataset
-from .evaluation import save_evaluation
+from .adaptation import adapted_identity, read_adapted_checkpoint
 from .preprocessing import preprocess, preprocessing_identity
 
 
-def identity_for(config):
-    return feature_identity(model_identity(config["model"]), preprocessing_identity(config["preprocessing"]), config["features"]["save_patches"], config["features"]["patch_dtype"])
+def identity_for(config, checkpoint=None):
+    model = adapted_identity(checkpoint, config["model"]) if checkpoint else model_identity(config["model"])
+    return feature_identity(model, preprocessing_identity(config["preprocessing"]), config["features"]["save_patches"], config["features"]["patch_dtype"])
 
 
 def prepare_data(config):
@@ -59,124 +61,99 @@ def load_caches(manifest_path, identity):
     return caches, manifest
 
 
-def run(config, stage="all", manifest_path=None, image_path=None, checkpoint_path=None):
+def run(config, stage="all", checkpoint_path=None):
+    if stage not in ("all", "system", "inspect", "finetune", "extract"):
+        raise ValueError("Classification stages were removed. Use all, finetune, extract, inspect, or system.")
+    config = deepcopy(config)
     output = Path(config["runtime"]["output_dir"])
     info = system_info()
     print(f"Host: {info['platform']}; Python architecture: {info['machine']}")
     if stage == "system":
         print(json.dumps(info, indent=2))
         return info
-    if stage in ("all", "extract", "train", "evaluate", "predict"):
-        require_mlx()  # Fail before any dataset/model download on unsupported hosts.
-    identity = identity_for(config)
-    if stage == "predict":
-        if not image_path or not checkpoint_path:
-            raise ValueError("predict requires --image and --checkpoint")
-        from PIL import Image
-        from .training import load_classifier, predict_probabilities
-        model = load_classifier(checkpoint_path, identity)
-        extractor = DINOv2Extractor(config["model"], config["preprocessing"]["image_size"])
-        with Image.open(image_path) as image:
-            x = preprocess(image, **config["preprocessing"])[None]
-        features = extractor.extract(x)
-        probability = predict_probabilities(model, features["cls"])[0]
-        result = {"image": str(Path(image_path).resolve()), "prediction": ["NORMAL", "ABNORMAL"][probability.argmax()], "probability_abnormal": float(probability[1]), "cls_first_8": features["cls"][0, :8].tolist(), "patch_shape": list(features["patches"].shape), "use": "experimental research only"}
+    if checkpoint_path is not None and stage != "extract":
+        raise ValueError("--checkpoint is for extract only; all/finetune adapt the pinned pretrained backbone")
+    if stage == "inspect":
+        config["dataset"]["allow_download"] = False
+        config["dataset"]["max_per_class"] = min(config["dataset"]["max_per_class"] or 4, 4)
+    else:
+        require_mlx()  # Always precedes dataset/model access.
+    checkpoint = Path(checkpoint_path or output / "finetuning/backbone.safetensors")
+    if stage == "extract":
+        # Never silently substitute pretrained weights for an absent adapted model.
+        read_adapted_checkpoint(checkpoint, config["model"])
+    datasets, dataset_summary = prepare_data(config)
+    output.mkdir(parents=True, exist_ok=True)
+    if stage == "inspect":
+        write_json(output / "inspection_dataset_summary.json", dataset_summary)
+        write_json(output / "inspection_config.resolved.json", config)
+        checked = {}
+        for split, dataset in datasets.items():
+            for i in range(len(dataset)):
+                x = dataset[i]["image"]
+                if x.shape != (config["preprocessing"]["image_size"],) * 2 + (3,) or not np.isfinite(x).all():
+                    raise ValueError("Invalid preprocessing output")
+            checked[split] = len(dataset)
+        result = {"status": "portable dataset/preprocessing check passed; no model executed", "images_decoded": checked, "system": info}
+        write_json(output / "portable_smoke.json", result)
         print(json.dumps(result, indent=2))
         return result
-    manifest_path = Path(manifest_path or output / "features_manifest.json")
-    if stage in ("all", "inspect", "extract"):
-        # Platform checks precede dataset retrieval, including extract-only runs.
-        datasets, dataset_summary = prepare_data(config)
-        output.mkdir(parents=True, exist_ok=True)
-        write_json(output / "dataset_summary.json", dataset_summary)
-        write_json(output / "config.resolved.json", config)
-        if stage == "inspect":
-            checked = {}
-            for split, dataset in datasets.items():
-                for i in range(len(dataset)):
-                    x = dataset[i]["image"]
-                    if x.shape != (config["preprocessing"]["image_size"],) * 2 + (3,) or not np.isfinite(x).all():
-                        raise ValueError("Invalid preprocessing output")
-                checked[split] = len(dataset)
-            result = {"status": "portable dataset/preprocessing check passed; no model executed", "images_decoded": checked, "system": info}
-            write_json(output / "portable_smoke.json", result)
-            print(json.dumps(result, indent=2))
-            return result
-        shared = []
-        def factory():
-            if not shared:
-                shared.append(DINOv2Extractor(config["model"], config["preprocessing"]["image_size"]))
-            return shared[0]
-        indices, stats = {}, {}
-        for split, dataset in datasets.items():
-            path, stat = extract_cached(dataset, identity, config["features"]["cache_dir"], config["features"]["batch_size"], config["features"]["shard_size"], factory)
-            try:
-                indices[split] = Path(os.path.relpath(path.resolve(), manifest_path.resolve().parent)).as_posix()
-            except ValueError:  # Windows caches can be on a different drive.
-                indices[split] = str(path.resolve())
-            stats[split] = stat
-            print(f"{split}: extracted {stat['extracted']}, reused {stat['reused']}")
-        write_json(manifest_path, {"identity": identity, "indices": indices, "dataset": dataset_summary})
-        write_json(output / "extraction_benchmark.json", stats)
-        shared.clear()  # Release backbone before classifier training.
-        if stage == "extract":
-            return stats
-    caches, manifest = load_caches(manifest_path, identity)
-    from .training import load_classifier, predict_probabilities, train_classifier
-    write_json(output / ("evaluation_config.resolved.json" if stage == "evaluate" else "config.resolved.json"), config)
-    if stage in ("all", "train"):
-        model, training_stats = train_classifier(caches["train"], caches["val"], config["training"], output, config["runtime"]["seed"])
-    else:
-        path = checkpoint_path or output / "checkpoints/best_classifier.safetensors"
-        model = load_classifier(path, identity)
-        checkpoint_metadata = json.loads(Path(path).with_suffix(".json").read_text(encoding="utf-8"))
-        training_stats = {"checkpoint": str(path), "training": "not run during evaluation", "checkpoint_training_config": checkpoint_metadata["training"], "checkpoint_seed": checkpoint_metadata["seed"]}
-    if stage == "train":
-        write_json(output / "experiment_metadata.json", {"system": info, "config": config, "feature_manifest": str(manifest_path.resolve()), "feature_identity": identity, "dataset": manifest["dataset"], "training": training_stats, "test_evaluated": False})
-        print(json.dumps(training_stats, indent=2))
-        return training_stats
-    test_x, test_y = caches["test"].load_cls()
-    probabilities = predict_probabilities(model, test_x, config["training"]["batch_size"])
-    metrics = save_evaluation(output / "metrics", test_y, probabilities, caches["test"].index["records"])
-    sample_id = caches["test"].index["records"][0]["sample_id"]
-    sample = caches["test"].load_sample(sample_id)
-    example = {"sample_id": sample_id, "cls_shape": list(sample["cls"].shape), "cls_first_8": sample["cls"][:8].tolist(), "patch_shape": list(sample["patches"].shape) if "patches" in sample else None}
-    write_json(output / "feature_example.json", example)
+    if stage in ("all", "finetune"):
+        from .finetuning import finetune
+        checkpoint = finetune(datasets["train"], config, output)
+    adaptation = read_adapted_checkpoint(checkpoint, config["model"])
+    # A rejected/reconfigured run must not overwrite the earlier run's provenance.
+    write_json(output / ("extraction_dataset_summary.json" if stage == "extract" else "dataset_summary.json"), dataset_summary)
+    write_json(output / ("extraction_config.resolved.json" if stage == "extract" else "config.resolved.json"), config)
+    metadata = {"system": info, "config": config, "dataset": dataset_summary,
+                "checkpoint": str(checkpoint.resolve()), "adaptation": adaptation,
+                "protocol": "Self-supervised adaptation on TRAIN only; EMA backbone dense extraction; no classifier"}
+    if stage == "finetune":
+        write_json(output / "experiment_metadata.json", metadata)
+        return {"checkpoint": str(checkpoint)}
+    identity = identity_for(config, checkpoint)
+    manifest_path = output / "features_manifest.json"
+    shared = []
+    def factory():
+        if not shared:
+            shared.append(DINOv2Extractor(config["model"], config["preprocessing"]["image_size"], checkpoint=checkpoint))
+        return shared[0]
+    indices, stats = {}, {}
+    for split, dataset in datasets.items():
+        path, stat = extract_cached(dataset, identity, config["features"]["cache_dir"], config["features"]["batch_size"], config["features"]["shard_size"], factory)
+        try:
+            indices[split] = Path(os.path.relpath(path.resolve(), manifest_path.resolve().parent)).as_posix()
+        except ValueError:  # Windows caches can be on a different drive.
+            indices[split] = str(path.resolve())
+        stats[split] = stat
+        print(f"{split}: extracted {stat['extracted']}, reused {stat['reused']}")
+    write_json(manifest_path, {"identity": identity, "indices": indices, "dataset": dataset_summary,
+                               "adapted_checkpoint": str(checkpoint.resolve())})
+    write_json(output / "extraction_benchmark.json", stats)
+    metadata.update({"feature_manifest": str(manifest_path.resolve()), "feature_identity": identity})
     import mlx.core as mx
-    memory = {"mlx_peak_bytes": mx.get_peak_memory()}
-    try:
-        import resource
-        memory["process_peak_rss_bytes_macos"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    except ImportError:
-        pass
-    metadata_name = "evaluation_metadata.json" if stage == "evaluate" else "experiment_metadata.json"
-    write_json(output / metadata_name, {"system": info, "config": config, "feature_manifest": str(manifest_path.resolve()), "feature_identity": identity, "dataset": manifest["dataset"], "training": training_stats, "memory": memory, "protocol": "Frozen pretrained DINOv2; supervised MLX linear probe; validation-only selection; final test evaluation", "clinical_validation": False})
-    print(json.dumps({"metrics": metrics, "output_dir": str(output), "feature_example": example}, indent=2))
-    return metrics
+    metadata["mlx_peak_bytes"] = mx.get_peak_memory()
+    write_json(output / ("extraction_metadata.json" if stage == "extract" else "experiment_metadata.json"), metadata)
+    print(f"Dense representations saved. Manifest: {manifest_path}")
+    return {"checkpoint": str(checkpoint), "feature_manifest": str(manifest_path), "extraction": stats}
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Local-first OCT DINOv2 MLX research pipeline")
+    parser = argparse.ArgumentParser(description="Fine-tune DINOv2 on OCT with self-supervision, then save dense representations only")
     parser.add_argument("--config", default=str(ROOT / "configs/smoke_test.yaml"))
     parser.add_argument("--dataset-path", help="Existing local root overrides OCT_DATASET_PATH and YAML")
     parser.add_argument("--output-dir")
-    parser.add_argument("--stage", choices=["all", "system", "inspect", "extract", "train", "evaluate", "predict"], default="all")
-    parser.add_argument("--feature-manifest", help="Train/evaluate directly from existing caches without dataset/model access")
-    parser.add_argument("--checkpoint")
-    parser.add_argument("--image")
-    parser.add_argument("--offline", action="store_true", help="Disable both dataset and checkpoint network downloads")
+    parser.add_argument("--stage", choices=["all", "system", "inspect", "finetune", "extract"], default="all",
+                        help="all (default): fine-tune/reuse completed adaptation, then extract; no classifier")
+    parser.add_argument("--checkpoint", help="For extract: existing fine-tuned backbone.safetensors (default: output-dir/finetuning/backbone.safetensors)")
+    parser.add_argument("--offline", action="store_true", help="Disable both dataset and pretrained checkpoint network downloads")
     args = parser.parse_args()
     try:
         config = load_config(args.config, args.dataset_path, args.output_dir)
         if args.offline:
             config["dataset"]["allow_download"] = config["model"]["allow_download"] = False
-        if args.stage == "inspect" and config["dataset"]["max_per_class"] is None:
-            # This command is a bounded smoke test, even with the full configuration.
-            config["dataset"]["max_per_class"] = 4
-        if args.stage == "inspect":
-            config["dataset"]["allow_download"] = False
-        run(config, args.stage, args.feature_manifest, args.image, args.checkpoint)
-    except (ValueError, RuntimeError, FileNotFoundError, ImportError) as exc:
+        run(config, args.stage, args.checkpoint)
+    except (ValueError, RuntimeError, OSError, ImportError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     return 0

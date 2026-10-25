@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oct-dinov2-mlx"
-version = "0.1.0"
-description = "Local-first frozen DINOv2 features and MLX retinal OCT classification"
+version = "0.2.0"
+description = "Self-supervised OCT adaptation of DINOv2 and dense representations with Apple MLX"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.26", "Pillow>=10.3", "PyYAML>=6", "scikit-learn>=1.4", "matplotlib>=3.8", "huggingface-hub>=0.26", "kagglehub>=0.3.13"]
+dependencies = ["numpy>=1.26", "Pillow>=10.3", "PyYAML>=6", "scikit-learn>=1.4", "huggingface-hub>=0.26", "kagglehub>=0.3.13"]
 
 [project.optional-dependencies]
 mac = ["mlx>=0.32.2,<0.33", "mlx-vlm==0.7.6"]

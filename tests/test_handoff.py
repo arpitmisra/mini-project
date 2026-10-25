@@ -1,9 +1,6 @@
 """Regression tests for first-run errors and moving a research run to another Mac."""
 import json
 import shutil
-import sys
-from pathlib import Path
-from types import ModuleType, SimpleNamespace
 
 import numpy as np
 import pytest
@@ -15,7 +12,7 @@ from oct_dinov2_mlx.common import write_json
 from oct_dinov2_mlx.config import ROOT, load_config
 
 
-@pytest.mark.parametrize("stage", ["all", "extract", "train", "evaluate", "predict"])
+@pytest.mark.parametrize("stage", ["all", "extract", "finetune"])
 def test_unsupported_host_fails_before_dataset_access(stage, monkeypatch, tmp_path):
     config = load_config(ROOT / "configs/default.yaml", output_dir=str(tmp_path))
     def unsupported():
@@ -32,11 +29,19 @@ def test_unsupported_host_fails_before_dataset_access(stage, monkeypatch, tmp_pa
     {"features": {"cache_dir": None}},
     {"preprocessing": {"image_size": 224.0}},
     {"preprocessing": {"resize_shortest": "256"}},
-    {"training": {"learning_rate": float("nan")}},
-    {"training": {"learning_rate": "1e-3"}},
-    {"training": {"weight_decay": float("inf")}},
+    {"finetuning": {"learning_rate": float("nan")}},
+    {"finetuning": {"learning_rate": "1e-3"}},
+    {"finetuning": {"weight_decay": float("inf")}},
     {"dataset": {"validation_fraction": "0.1"}},
     {"dataset": {"version": -1}},
+    {"finetuning": {"mask_ratio": 1}},
+    {"finetuning": {"teacher_momentum": 0}},
+    {"finetuning": {"student_temperature": 0}},
+    {"finetuning": {"patch_loss_weight": 0}},
+    {"finetuning": {"max_steps_per_epoch": True}},
+    {"finetuning": {"augmentation_strength": 2}},
+    {"finetuning": {"prototypes": 1}},
+    {"features": {"save_patches": False}},
 ])
 def test_bad_configuration_reports_value_error(supplied, tmp_path):
     path = tmp_path / "bad.yaml"
@@ -57,7 +62,6 @@ class SyntheticCacheExtractor:
 def make_cached_run(oct_root, directory):
     config = load_config(ROOT / "configs/smoke_test.yaml", str(oct_root), str(directory / "run"))
     config["dataset"]["max_per_class"] = 1
-    config["features"]["save_patches"] = False
     identity = pipeline.identity_for(config)
     datasets, summary = pipeline.prepare_data(config)
     indices = {}
@@ -80,28 +84,8 @@ def test_relative_manifest_survives_moving_outputs(oct_root, tmp_path, monkeypat
     assert caches["train"].load_cls()[0].shape == (4, 384)
 
 
-def test_evaluate_preserves_training_provenance(oct_root, tmp_path, monkeypatch):
-    config, manifest = make_cached_run(oct_root, tmp_path)
-    output = Path(config["runtime"]["output_dir"])
-    original = {"training": {"best_val_loss": .25, "epochs_completed": 3}}
-    write_json(output / "experiment_metadata.json", original)
-    write_json(output / "config.resolved.json", {"original_training_config": True})
-    checkpoint = output / "checkpoints/best_classifier.safetensors"
-    write_json(checkpoint.with_suffix(".json"), {"training": {"epochs": 3}, "seed": 42})
-    fake_training = ModuleType("oct_dinov2_mlx.training")
-    fake_training.load_classifier = lambda *_: object()
-    fake_training.train_classifier = lambda *_: pytest.fail("Evaluation retrained a classifier")
-    fake_training.predict_probabilities = lambda _, x, __: np.tile([.4, .6], (len(x), 1))
-    fake_mlx = ModuleType("mlx")
-    fake_mlx.core = SimpleNamespace(get_peak_memory=lambda: 0)
-    monkeypatch.setitem(sys.modules, "mlx", fake_mlx)
-    monkeypatch.setitem(sys.modules, "mlx.core", fake_mlx.core)
-    monkeypatch.setitem(sys.modules, "oct_dinov2_mlx.training", fake_training)
-    monkeypatch.setattr(pipeline, "require_mlx", lambda: None)
-    monkeypatch.setattr(pipeline, "save_evaluation", lambda *_: {"test_only": True})
-    pipeline.run(config, "evaluate", manifest, checkpoint_path=checkpoint)
-    assert json.loads((output / "experiment_metadata.json").read_text()) == original
-    assert json.loads((output / "config.resolved.json").read_text()) == {"original_training_config": True}
-    evaluation = json.loads((output / "evaluation_metadata.json").read_text())
-    assert evaluation["training"]["checkpoint_training_config"] == {"epochs": 3}
-    assert (output / "evaluation_config.resolved.json").is_file()
+@pytest.mark.parametrize("stage", ["train", "evaluate", "predict"])
+def test_classifier_stages_are_rejected(stage, tmp_path):
+    config = load_config(ROOT / "configs/smoke_test.yaml", output_dir=str(tmp_path))
+    with pytest.raises(ValueError, match="Classification stages were removed"):
+        pipeline.run(config, stage)

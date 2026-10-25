@@ -12,40 +12,6 @@ from oct_dinov2_mlx.common import require_mlx
 
 require_mlx()  # A broken Mac setup must fail, not silently skip the native tests.
 import mlx.core as mx
-import mlx.nn as nn
-import mlx.optimizers as optim
-
-from oct_dinov2_mlx.training import BinaryClassifier, load_classifier, predict_probabilities, save_classifier, weighted_cross_entropy
-
-
-def test_gradients_loss_decrease_and_checkpoint(tmp_path):
-    mx.random.seed(42)
-    rng = np.random.default_rng(42)
-    labels = np.repeat([0, 1], 16).astype(np.int32)
-    features = rng.normal(0, .1, (32, 384)).astype(np.float32)
-    features[:, 0] += labels * 4 - 2
-    x, y = mx.array(features), mx.array(labels)
-    model, optimizer = BinaryClassifier(), optim.Adam(learning_rate=.02)
-    weights = mx.ones((2,))
-    initial = np.asarray(model.linear.weight).copy()
-    first = float(weighted_cross_entropy(model, x, y, weights).item())
-    gradient_fn = nn.value_and_grad(model, weighted_cross_entropy)
-    for _ in range(35):
-        loss, gradients = gradient_fn(model, x, y, weights)
-        optimizer.update(model, gradients)
-        mx.eval(model.parameters(), optimizer.state, loss)
-    assert float(weighted_cross_entropy(model, x, y, weights).item()) < first * .5
-    assert not np.array_equal(initial, np.asarray(model.linear.weight))
-    before = predict_probabilities(model, features)
-    checkpoint = tmp_path / "head.safetensors"
-    identity = {"test": "synthetic"}
-    save_classifier(model, checkpoint, identity, {}, 42)
-    restored = load_classifier(checkpoint, identity)
-    np.testing.assert_allclose(before, predict_probabilities(restored, features), atol=1e-6)
-    assert np.isin(before.argmax(1), [0, 1]).all()
-    with pytest.raises(ValueError, match="metadata mismatch"):
-        load_classifier(checkpoint, {"wrong": True})
-
 
 def test_architecture_shapes_batch_and_frozen_parameters():
     from mlx.utils import tree_flatten
@@ -108,13 +74,24 @@ def test_pretrained_end_to_end_and_cache_reuse(oct_root, tmp_path, monkeypatch):
     config = load_config(ROOT / "configs/smoke_test.yaml", str(oct_root), str(tmp_path / "run"))
     config["dataset"]["max_per_class"] = 1
     config["features"]["cache_dir"] = str(tmp_path / "features")
-    config["training"]["epochs"] = 2
+    config["finetuning"]["epochs"] = 1
+    config["finetuning"]["max_steps_per_epoch"] = 1
     first = pipeline.run(config)
-    assert first["count"] == 4
-    assert (tmp_path / "run/checkpoints/best_classifier.safetensors").is_file()
+    assert first["extraction"]["test"]["extracted"] == 4
+    assert (tmp_path / "run/finetuning/backbone.safetensors").is_file()
+    assert not (tmp_path / "run/metrics").exists()
+    # A completed adapted backbone must load without the original HF cache.
+    from oct_dinov2_mlx import backbone
+    monkeypatch.setattr(backbone, "checkpoint_files", lambda *_: pytest.fail("Adapted extraction requested original weights"))
+    adapted = backbone.DINOv2Extractor(config["model"], checkpoint=first["checkpoint"])
+    assert "adaptation_method" in adapted.metadata
+    assert all(not key.startswith(("global_head", "patch_head")) for key in mx.load(first["checkpoint"]))
+    del adapted
+    from oct_dinov2_mlx import finetuning
+    monkeypatch.setattr(finetuning, "train_step", lambda *a: pytest.fail("Completed run retrained backbone"))
     from oct_dinov2_mlx.representations import export_dense_sample
     metadata = export_dense_sample(tmp_path / "run/features_manifest.json", tmp_path / "dense.npz")
     assert metadata["arrays"]["spatial_grid"]["shape"] == [16, 16, 384]
-    monkeypatch.setattr(pipeline, "DINOv2Extractor", lambda *_: pytest.fail("Cache reuse reloaded backbone"))
+    monkeypatch.setattr(pipeline, "DINOv2Extractor", lambda *a, **k: pytest.fail("Cache reuse reloaded backbone"))
     second = pipeline.run(config)
-    assert second["count"] == 4
+    assert second["extraction"]["test"]["reused"] == 4

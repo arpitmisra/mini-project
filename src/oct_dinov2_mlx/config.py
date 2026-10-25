@@ -35,10 +35,10 @@ def load_config(path, local_path=None, output_dir=None) -> dict:
         if cfg[section][key]:
             p = Path(os.path.expandvars(str(cfg[section][key]))).expanduser()
             cfg[section][key] = str((ROOT / p).resolve() if not p.is_absolute() else p.resolve())
-    for section, key in (("dataset", "allow_download"), ("dataset", "hash_images"), ("model", "allow_download"), ("features", "save_patches"), ("training", "weighted_loss")):
+    for section, key in (("dataset", "allow_download"), ("dataset", "hash_images"), ("model", "allow_download"), ("features", "save_patches")):
         if not isinstance(cfg[section][key], bool):
             raise ValueError(f"{section}.{key} must be a YAML boolean (true/false, without quotes)")
-    for section, key in (("features", "batch_size"), ("features", "shard_size"), ("training", "epochs"), ("training", "batch_size"), ("training", "patience")):
+    for section, key in (("features", "batch_size"), ("features", "shard_size"), ("finetuning", "epochs"), ("finetuning", "batch_size"), ("finetuning", "head_hidden_dim"), ("finetuning", "head_bottleneck_dim"), ("finetuning", "prototypes")):
         if type(cfg[section][key]) is not int or cfg[section][key] < 1:
             raise ValueError(f"{section}.{key} must be a positive integer")
     limit = cfg["dataset"]["max_per_class"]
@@ -53,10 +53,26 @@ def load_config(path, local_path=None, output_dir=None) -> dict:
         raise ValueError("image_size must be a multiple of 14; resize_shortest must be at least image_size")
     if cfg["features"]["patch_dtype"] not in ("float16", "float32"):
         raise ValueError("patch_dtype must be float16 or float32")
-    for key in ("learning_rate", "weight_decay"):
-        value = cfg["training"][key]
-        if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or (key == "learning_rate" and value == 0):
-            raise ValueError(f"training.{key} must be finite and {'positive' if key == 'learning_rate' else 'nonnegative'}")
+    if not cfg["features"]["save_patches"]:
+        raise ValueError("Dense-representation mode requires features.save_patches=true")
+    if size < 28:
+        raise ValueError("Masked patch adaptation requires image_size >= 28")
+    for key in ("learning_rate", "weight_decay", "student_temperature", "teacher_temperature", "global_loss_weight", "patch_loss_weight", "gradient_clip"):
+        value = cfg["finetuning"][key]
+        if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or (key != "weight_decay" and value == 0):
+            raise ValueError(f"finetuning.{key} must be finite and {'nonnegative' if key == 'weight_decay' else 'positive'}")
+    for key in ("teacher_momentum", "center_momentum", "mask_ratio"):
+        value = cfg["finetuning"][key]
+        if type(value) not in (int, float) or not math.isfinite(value) or not 0 < value < 1:
+            raise ValueError(f"finetuning.{key} must be between 0 and 1")
+    strength = cfg["finetuning"]["augmentation_strength"]
+    if type(strength) not in (int, float) or not math.isfinite(strength) or not 0 <= strength <= 0.5:
+        raise ValueError("augmentation_strength must be between 0 and 0.5")
+    steps = cfg["finetuning"]["max_steps_per_epoch"]
+    if steps is not None and (type(steps) is not int or steps < 1):
+        raise ValueError("max_steps_per_epoch must be null or a positive integer")
+    if cfg["finetuning"]["prototypes"] < 2:
+        raise ValueError("Self-supervised projection requires at least two prototypes")
     if type(cfg["runtime"]["seed"]) is not int or not 0 <= cfg["runtime"]["seed"] < 2**32:
         raise ValueError("runtime.seed must be an integer in [0, 2**32)")
     version = cfg["dataset"]["version"]
