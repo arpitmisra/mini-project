@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -12,7 +13,7 @@ import numpy as np
 from .cache import FeatureCache
 from .common import file_digest
 from .config import ROOT, load_config
-from .pipeline import run
+from .pretrained import run, self_test
 from .representations import export_dense_sample
 
 
@@ -75,11 +76,17 @@ def show(output_dir, split="test", sample_id=None, all_values=False):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Fine-tune DINOv2 on OCT, then save and view dense features.")
+    parser = argparse.ArgumentParser(description="Extract and view dense features with frozen pretrained DINOv2. No training.")
     commands = parser.add_subparsers(dest="command", required=True)
-    execute = commands.add_parser("run", help="Small local smoke run; add --full for the full experiment")
+    execute = commands.add_parser("run", help="Extract a 12-image local sample; add --full for all images")
     execute.add_argument("dataset", nargs="?", help="Local OCT directory (quote paths with spaces); otherwise use OCT_DATASET_PATH/default")
     execute.add_argument("--offline", action="store_true", help="Prohibit dataset and pretrained-weight downloads")
+    execute.add_argument("--device", choices=("cpu", "mps", "cuda"), default="cpu", help="CPU is the portable default; MPS is optional Mac acceleration")
+    check = commands.add_parser("test", help="Test the real pretrained model on two artificial images; no OCT dataset needed")
+    check.add_argument("--device", choices=("cpu", "mps", "cuda"), default="cpu")
+    check.add_argument("--offline", action="store_true")
+    check.add_argument("--output-dir", default=str(ROOT / "outputs/self-test"))
+    check.set_defaults(full=False)
     display = commands.add_parser("show", help="Export and display one saved scan; no model or original images needed")
     display.add_argument("--split", choices=("train", "val", "test"), default="test")
     display.add_argument("--sample-id", help="Exact sample_id from the split index; defaults to the first scan")
@@ -90,22 +97,40 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         config = load_config(ROOT / "configs" / ("default.yaml" if args.full else "smoke_test.yaml"),
-                             local_path=getattr(args, "dataset", None), output_dir=args.output_dir)
+                             local_path=getattr(args, "dataset", None),
+                             output_dir=args.output_dir or str(ROOT / "outputs" / ("pretrained" if args.full else "pretrained-smoke")))
+        if args.command == "test":
+            if args.offline:
+                config["model"]["allow_download"] = False
+            self_test(config, args.device)
+            return 0
         if args.command == "show":
             show(config["runtime"]["output_dir"], args.split, args.sample_id, args.all_values)
             return 0
         if args.offline:
             config["dataset"]["allow_download"] = config["model"]["allow_download"] = False
-        print("FULL experiment: train-only self-supervised adaptation, then dense extraction." if args.full else
-              "SMOKE check: at most 48 images, two training updates, then dense extraction. Dataset downloads disabled.")
+        if not args.full:
+            config["dataset"]["max_per_class"] = 1
+            config["dataset"]["allow_download"] = False
+        print("FULL dataset: frozen pretrained dense extraction. No training." if args.full else
+              "SMOKE check: at most 12 images, frozen pretrained extraction. No training or dataset download.")
         print(f"Results: {config['runtime']['output_dir']}")
-        result = run(config)
+        result = run(config, device=args.device)
         print(f"\nFinished. Features: {result['feature_manifest']}")
-        next_command = "python oct.py show" + (" --full" if args.full else "")
+        next_command = os.environ.get("OCT_COMMAND_PREFIX", "python oct.py") + " show" + (" --full" if args.full else "")
         if args.output_dir:
             next_command += f' --output-dir "{args.output_dir}"'
         print(f"Next: {next_command}")
         return 0
-    except (ValueError, RuntimeError, OSError, ImportError, KeyError) as exc:
+    except Exception as exc:
+        # Keep the complete diagnostic for a remote handoff rather than guessing.
+        import traceback
+        log = ROOT / "outputs/last-error.log"
+        try:
+            log.parent.mkdir(parents=True, exist_ok=True)
+            log.write_text(traceback.format_exc(), encoding="utf-8")
+            print(f"Diagnostic saved to {log}", file=sys.stderr)
+        except OSError:
+            pass
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

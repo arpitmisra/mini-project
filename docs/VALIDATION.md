@@ -1,3 +1,26 @@
+# Current baseline validation — 2 November 2026
+
+The default now uses **frozen pretrained DINOv2 through PyTorch 2.9.1 / Transformers 4.57.6**, on CPU unless another device is explicitly selected. The earlier professor traceback was unavailable: no specific original failure is diagnosed here. Replacing the default removes its dependency on unexecuted native MLX fine-tuning.
+
+Executed locally on Windows AMD64 / Python 3.14.5:
+
+- Installed the pinned engines in an isolated environment; `pip check` passed.
+- Downloaded the exact ~89 MB pretrained model; existing revision, configuration and SHA-256 checks passed.
+- `oct.py test` passed with **real weights** and two artificial images: output shapes, nontrivial finite features, batch-versus-single agreement and NPZ save/reload. Machine-readable evidence: [BASELINE_VALIDATION.json](BASELINE_VALIDATION.json).
+- `oct.py run data/OCT2017 --offline` extracted **12 real local OCT scans** (4 per split), with no dataset download. Only this bounded selection was hashed/decoded; directory filenames were enumerated for counts.
+- `oct.py show` exported real arrays with patches (256,384), grid (16,16,384) and CLS (384,). Local artifact: `outputs/pretrained-smoke/dense_sample.npz`. Generated data is ignored by Git.
+- Repeated local extraction reported **extracted 0, reused 4** for every split; no further model construction was needed.
+- Tests with `OCT_TEST_BASELINE=1`: **75 passed, 2 optional MLX modules skipped**. Real-checkpoint tests cover bounded synthetic dataset extraction, export, correct patch/grid indexing, repeat cache reuse and batch consistency. An initial test-only float16 standard-deviation warning was corrected by measuring that statistic in float32.
+- Companion rank/SVD/LoRA numerical examples executed and assertions passed.
+
+The new GitHub workflow runs actual pretrained CPU inference and end-to-end tests on Windows, Linux and macOS. Its Mac job uses `bash oct.sh setup` and `bash oct.sh test`, matching the user instructions. Consult the workflow result for the exact published commit; a workflow definition is not proof of execution.
+
+These checks do **not** establish segmentation accuracy, improvement from adaptation, patient independence, full-dataset runtime, or MPS/GPU correctness. CPU execution on a Mac runner also does not establish that the professor's particular installation has passed. The quick-start self-test is the local acceptance check.
+
+The default baseline has no trainable classifier, adapter or segmentation decoder. Optional MLX tests require their own environment and `OCT_TEST_MLX=1`. The older records below refer to previous workflows.
+
+---
+
 # Simple run/show commands — 25 October 2026
 
 The professor-facing workflow now uses `python oct.py run "/path/to/OCT2017"` and `python oct.py show`. The wrapper delegates adaptation/extraction to the existing pipeline. Smoke selection remains bounded; only `--full` selects the full experiment and permits dataset fallback. Viewing exports one scan without MLX or original images and checks the export's identity/checksum before reuse.

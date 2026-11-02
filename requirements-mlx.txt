@@ -1,0 +1,2 @@
+# Optional earlier adaptation experiment; install in a separate environment.
+-e .[mac,test]

@@ -6,6 +6,8 @@ import numpy as np
 import pytest
 
 pytestmark = pytest.mark.mlx
+if os.environ.get("OCT_TEST_MLX") != "1":
+    pytest.skip("Optional MLX experiment: set OCT_TEST_MLX=1 in its separate environment", allow_module_level=True)
 if platform.system() != "Darwin" or platform.machine().lower() != "arm64":
     pytest.skip("Native Apple Silicon required", allow_module_level=True)
 from oct_dinov2_mlx.common import require_mlx

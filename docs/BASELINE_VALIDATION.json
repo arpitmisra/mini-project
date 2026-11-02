@@ -1,0 +1,53 @@
+{
+  "batch_vs_single_max_error": {
+    "cls": 0.0,
+    "patches": 0.0
+  },
+  "device": "cpu",
+  "images": 2,
+  "model": {
+    "adapter_version": 1,
+    "architecture": "dinov2_vits14",
+    "compute_dtype": "float32",
+    "device": "cpu",
+    "embedding_dim": 384,
+    "implementation": "transformers==4.57.6",
+    "patch_size": 14,
+    "register_tokens": 0,
+    "repo_id": "facebook/dinov2-small",
+    "revision": "ed25f3a31f01632728cabb09d1542f84ab7b0056",
+    "torch_version": "2.9.1+cpu",
+    "training": "none: frozen pretrained baseline",
+    "weights_sha256": "ae1e99fcefd534ed978cdeb8326f08030c96e28b7a81ffcbc98a857c84d14be1"
+  },
+  "passed": true,
+  "real_pretrained_weights": true,
+  "shapes": {
+    "cls": [
+      2,
+      384
+    ],
+    "patches": [
+      2,
+      256,
+      384
+    ]
+  },
+  "synthetic_inputs": true,
+  "system": {
+    "machine": "AMD64",
+    "packages": {
+      "Pillow": "13.0.0",
+      "kagglehub": "1.0.3",
+      "mlx": null,
+      "mlx-vlm": null,
+      "numpy": "2.5.4",
+      "safetensors": "0.8.0",
+      "scikit-learn": "1.9.1",
+      "torch": "2.9.1",
+      "transformers": "4.57.6"
+    },
+    "platform": "Windows-11-10.0.26300-SP0",
+    "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  }
+}

@@ -1,3 +1,5 @@
+> Optional earlier MLX experiment. The current default is frozen pretrained extraction; see [README](../README.md) and [USAGE](USAGE.md). Install `requirements-mlx.txt` in a separate environment. Native tests require `OCT_TEST_MLX=1`. No LoRA or segmentation training is implemented here.
+
 # Self-supervised OCT adaptation method
 
 The user selected self-supervised teacher–student adaptation. The aim is to adapt a pretrained DINOv2 backbone to OCT appearance, then export dense representations only. There is no downstream classifier or disease-label objective.

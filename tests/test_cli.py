@@ -12,14 +12,14 @@ def test_run_routes_to_correct_config_and_same_pipeline(full, tmp_path, monkeypa
     dataset = tmp_path / "OCT data with spaces"
     output = tmp_path / "my results"
     seen = []
-    monkeypatch.setattr(cli, "run", lambda config: seen.append(config) or {"feature_manifest": "mock-manifest.json"})
+    monkeypatch.setattr(cli, "run", lambda config, device: seen.append(config) or {"feature_manifest": "mock-manifest.json"})
     args = ["run", str(dataset), "--output-dir", str(output)] + (["--full"] if full else [])
     assert cli.main(args) == 0
     config = seen[0]
     assert Path(config["dataset"]["local_path"]) == dataset
     assert Path(config["runtime"]["output_dir"]) == output
     assert config["dataset"]["allow_download"] is full
-    assert config["dataset"]["max_per_class"] == (None if full else 4)
+    assert config["dataset"]["max_per_class"] == (None if full else 1)
     assert config["finetuning"]["max_steps_per_epoch"] == (None if full else 2)
     assert config["finetuning"]["epochs"] == (5 if full else 1)
     assert config["features"]["save_patches"] is True
@@ -29,14 +29,14 @@ def test_run_routes_to_correct_config_and_same_pipeline(full, tmp_path, monkeypa
 def test_offline_and_environment_path_are_preserved(monkeypatch, tmp_path):
     monkeypatch.setenv("OCT_DATASET_PATH", str(tmp_path))
     seen = []
-    monkeypatch.setattr(cli, "run", lambda config: seen.append(config) or {"feature_manifest": "mock"})
+    monkeypatch.setattr(cli, "run", lambda config, device: seen.append(config) or {"feature_manifest": "mock"})
     assert cli.main(["run", "--full", "--offline"]) == 0
     assert Path(seen[0]["dataset"]["local_path"]) == tmp_path
     assert not seen[0]["dataset"]["allow_download"]
     assert not seen[0]["model"]["allow_download"]
 
 
-@pytest.mark.parametrize("full,directory", [(False, "smoke-adapted"), (True, "oct-adapted")])
+@pytest.mark.parametrize("full,directory", [(False, "pretrained-smoke"), (True, "pretrained")])
 def test_show_routes_to_matching_run(full, directory, monkeypatch):
     seen = []
     monkeypatch.setattr(cli, "show", lambda *args: seen.append(args))
@@ -52,7 +52,7 @@ def test_missing_results_are_actionable_without_starting_model(tmp_path, monkeyp
 
 
 def test_failure_does_not_print_finished(monkeypatch, capsys):
-    def fail(*_):
+    def fail(*_, **kwargs):
         raise RuntimeError("test native failure")
     monkeypatch.setattr(cli, "run", fail)
     assert cli.main(["run"]) == 1

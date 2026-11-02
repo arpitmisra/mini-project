@@ -1,3 +1,5 @@
+> Historical guide for the earlier adaptation workflow. For the current baseline use [FILES](FILES.md), [USAGE](USAGE.md) and the [README](../README.md). Old `oct.py` commands below are superseded; adaptation uses `run_pipeline.py`.
+
 # Repository guide: self-supervised adaptation and dense features
 
 The current objective is **fine-tune DINOv2 on OCT training images, then generate dense representations only**. It replaces the earlier frozen-backbone plus linear-classifier workflow. The current entry point never trains a diagnostic classifier and has no classification evaluation/prediction stages.

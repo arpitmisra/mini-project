@@ -31,7 +31,7 @@ def write_json(path: Path, value) -> None:
 
 def system_info() -> dict:
     packages = {}
-    for name in ("mlx", "mlx-vlm", "numpy", "Pillow", "kagglehub", "scikit-learn", "transformers"):
+    for name in ("torch", "safetensors", "mlx", "mlx-vlm", "numpy", "Pillow", "kagglehub", "scikit-learn", "transformers"):
         try:
             packages[name] = version(name)
         except PackageNotFoundError:
@@ -55,7 +55,7 @@ def require_mlx() -> None:
         import mlx.nn  # noqa: F401
         import mlx.optimizers  # noqa: F401
     except ImportError as exc:
-        raise RuntimeError("MLX is missing. On the Mac run: python -m pip install -r requirements.txt") from exc
+        raise RuntimeError("Optional MLX experiment is missing. Install requirements-mlx.txt in a separate Mac environment; use oct.py for the portable baseline.") from exc
     if not mx.metal.is_available():
         raise RuntimeError("MLX Metal is unavailable; check native Python and macOS compatibility.")
     mx.set_default_device(mx.gpu)

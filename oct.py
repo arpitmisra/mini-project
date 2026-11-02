@@ -1,4 +1,4 @@
-"""Simple run/show commands for the OCT adaptation pipeline."""
+"""Simple test/run/show commands for pretrained OCT dense features."""
 from pathlib import Path
 import sys
 
