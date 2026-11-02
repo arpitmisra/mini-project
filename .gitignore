@@ -16,3 +16,5 @@ outputs/
 kaggle.json
 dist/
 build/
+
+.venv-mlx-cpu/

@@ -1,3 +1,5 @@
+> CPU execution is now supported on the Windows MLX runtime too. See [MLX_CPU.md](MLX_CPU.md); older Apple-only validation statements below describe the earlier implementation.
+
 > Optional earlier MLX experiment. The current default is frozen pretrained extraction; see [README](../README.md) and [USAGE](USAGE.md). Install `requirements-mlx.txt` in a separate environment. Native tests require `OCT_TEST_MLX=1`. No LoRA or segmentation training is implemented here.
 
 # Self-supervised OCT adaptation method

@@ -13,13 +13,13 @@ from oct_dinov2_mlx.config import ROOT, load_config
 
 
 @pytest.mark.parametrize("stage", ["all", "extract", "finetune"])
-def test_unsupported_host_fails_before_dataset_access(stage, monkeypatch, tmp_path):
+def test_unavailable_mlx_fails_before_dataset_access(stage, monkeypatch, tmp_path):
     config = load_config(ROOT / "configs/default.yaml", output_dir=str(tmp_path))
     def unsupported():
-        raise RuntimeError("Apple Silicon required")
+        raise RuntimeError("MLX runtime unavailable")
     monkeypatch.setattr(pipeline, "require_mlx", unsupported)
     monkeypatch.setattr(pipeline, "prepare_data", lambda *_: pytest.fail("Dataset accessed before host check"))
-    with pytest.raises(RuntimeError, match="Apple Silicon"):
+    with pytest.raises(RuntimeError, match="MLX runtime unavailable"):
         pipeline.run(config, stage)
 
 

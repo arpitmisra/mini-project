@@ -1,0 +1,42 @@
+name: Real MLX CPU
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mlx:
+    name: MLX CPU / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    env:
+      OCT_MLX_DEVICE: cpu
+      OCT_TEST_MLX: '1'
+      OCT_TEST_PRETRAINED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install explicit CPU backend and DINOv2 adapter
+        run: python -m pip install -r requirements-mlx-cpu.txt
+      - name: Check installed dependencies
+        run: python -m pip check
+      - name: Real MLX CPU DINOv2 self-test
+        run: python mlx_cpu.py test
+      - name: Native MLX gradients, adaptation and portable regression tests
+        run: python -m pytest -q
+      - name: Upload runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlx-cpu-${{ matrix.os }}
+          path: |
+            outputs/mlx-cpu-self-test/self_test.json
+            outputs/mlx-cpu-last-error.log

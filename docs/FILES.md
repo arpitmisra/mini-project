@@ -66,3 +66,10 @@ The default is pretrained extraction. The historical package name contains `mlx`
 | `train_classifier.py` | Independent earlier ResNet classifier; not part of the current baseline. |
 | `dino_oct_cam.py` | Independent earlier original-DINO/CAM experiment; not part of the baseline. |
 | `dino` | Upstream DINO reference submodule, original commit/license; its own source tree is documented upstream. |
+| `mlx_cpu.py` | Explicit native MLX CPU test/run/show entry point. |
+| `requirements-mlx-cpu.txt` | Installs pinned MLX and the explicit Windows/Linux CPU backend in a separate environment. |
+| `src/oct_dinov2_mlx/mlx_cpu_cli.py` | Real MLX self-test and bounded frozen extraction/viewing. |
+| `tests/test_mlx_cpu.py` | Device policy, cache separation and bounded entry-point tests. |
+| `.github/workflows/mlx-cpu-tests.yml` | Real CPU inference, gradients and adaptation checks on Windows and macOS. |
+| `docs/MLX_CPU.md` | CPU installation and exact commands. |
+| `docs/MLX_CPU_VALIDATION.json` | Actual Windows MLX CPU self-test and PyTorch numerical comparison. |

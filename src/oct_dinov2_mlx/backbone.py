@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .common import file_digest, require_mlx
+from .common import file_digest, require_mlx, mlx_device_name
 
 MODEL_REPO = "facebook/dinov2-small"
 MODEL_REVISION = "ed25f3a31f01632728cabb09d1542f84ab7b0056"
@@ -20,7 +20,11 @@ def model_identity(config):
     if config["repo_id"] != MODEL_REPO or config["revision"] != MODEL_REVISION:
         raise ValueError("Only the verified pinned facebook/dinov2-small checkpoint is supported. Add architecture/coverage/parity tests before changing it.")
     # Base identity is available offline, without touching pretrained weights.
-    return {"repo_id": MODEL_REPO, "revision": MODEL_REVISION, "weights_sha256": MODEL_SHA256, "architecture": "dinov2_vits14", "embedding_dim": 384, "patch_size": 14, "register_tokens": 0, "implementation": f"mlx-vlm=={MLX_VLM_VERSION}", "adapter_version": 1, "compute_dtype": "float32"}
+    try:
+        runtime_version = version("mlx")
+    except PackageNotFoundError:
+        runtime_version = None
+    return {"repo_id": MODEL_REPO, "revision": MODEL_REVISION, "weights_sha256": MODEL_SHA256, "architecture": "dinov2_vits14", "embedding_dim": 384, "patch_size": 14, "register_tokens": 0, "implementation": f"mlx-vlm=={MLX_VLM_VERSION}", "adapter_version": 2, "compute_dtype": "float32", "mlx_version": runtime_version, "execution_device": mlx_device_name()}
 
 
 def validate_hf_config(config):

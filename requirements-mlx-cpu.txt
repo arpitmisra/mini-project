@@ -1,0 +1,3 @@
+# Separate environment: MLX-VLM and the PyTorch baseline use different Transformers versions.
+# Windows needs the explicit mlx-cpu package; mlx[cpu] 0.32.4 only selects it on Linux.
+-e .[mlx-cpu,test]

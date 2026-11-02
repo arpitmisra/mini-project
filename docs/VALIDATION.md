@@ -1,3 +1,28 @@
+# MLX CPU validation — 2 November 2026
+
+The earlier Apple-only restriction was incorrect for the current MLX release. Official MLX 0.32.4 and mlx-cpu 0.32.4 Windows wheels were installed in a dedicated environment. Runtime selection now supports CPU explicitly; the Mac Metal path remains selectable.
+
+Executed **natively on this Windows AMD64 CPU / Python 3.14.5**, without WSL and without PyTorch inference in the MLX environment:
+
+- MLX matrix multiplication and automatic differentiation passed.
+- The actual MLX-VLM 0.7.6 DINOv2 adapter loaded the verified pinned pretrained checkpoint.
+- Two-image real-model self-test passed: finite/nontrivial CLS and patches, batch-versus-single agreement and saved-array reload.
+- Frozen MLX extraction completed for **12 real local OCT scans**, with no dataset download.
+- Export produced CLS (384,), patches (256,384) and spatial grid (16,16,384).
+- A repeated run reused all four cached samples per split without another extraction.
+- **7 native MLX tests passed in 62.42 seconds**, including real pretrained inference, strict HF/native conversion, one-update backbone adaptation, final EMA save/reload, dense export/reuse, gradient/EMA/stop-gradient/masked-loss checks and optimizer/center/RNG resume.
+- Comparing the same deterministic artificial inputs against the independently run PyTorch reference passed at atol=5e-4 and rtol=1e-3. Maximum absolute differences: CLS **2.635e-5**, patches **9.895e-5**. This is initialization/inference parity, not proof of identical adaptation trajectories.
+- Complete suite in the MLX environment: **84 passed, 2 skipped in 103.36 seconds**. The skips are the separate PyTorch-baseline opt-in tests; the native MLX tests executed. The existing PyTorch feature cache was also rechecked and reused unchanged.
+- `pip check` passed in the MLX environment. Machine-readable records: [MLX_CPU_VALIDATION.json](MLX_CPU_VALIDATION.json).
+
+An installation attempt stalled after partial package installation; its specific cause was not established. Only that installer was stopped, and rerunning from cached packages completed successfully.
+
+The default pytest file-descriptor capture caused a reproducible Windows DLL initialization failure for MLX, while the normal CLI worked. Using `--capture=sys` made the native suite pass. This setting is now in pyproject.toml; no numerical assertions or native tests were disabled.
+
+Default commands remain the established PyTorch baseline. The explicit `mlx_cpu.py` commands use MLX CPU and separate output/cache identities. See [MLX_CPU.md](MLX_CPU.md) for exact setup/run/view commands. Full-dataset CPU throughput and clinical/segmentation quality are not established by these bounded checks.
+
+---
+
 # Current baseline validation — 2 November 2026
 
 The default now uses **frozen pretrained DINOv2 through PyTorch 2.9.1 / Transformers 4.57.6**, on CPU unless another device is explicitly selected. The earlier professor traceback was unavailable: no specific original failure is diagnosed here. Replacing the default removes its dependency on unexecuted native MLX fine-tuning.

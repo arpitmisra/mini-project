@@ -78,7 +78,8 @@ These tests establish software behavior, not segmentation quality; MPS is a sepa
 - [What every project file does](docs/FILES.md)
 - [Study guide: rank → SVD → LoRA/PEFT → Swin → weakly supervised OCT segmentation](docs/STUDY_GUIDE.md)
 - [Meeting agenda and proposed experiments](docs/MEETING.md)
-- [Optional earlier MLX adaptation experiment](docs/FINETUNING.md)
+- [Run the actual MLX DINOv2 code on a Windows or Mac CPU](docs/MLX_CPU.md)
+- [Optional MLX adaptation experiment](docs/FINETUNING.md)
 
 For publication, compare this baseline and later adapters on the **same patient-independent evaluation protocol**.
 Improvement is a hypothesis to test. Dense representations alone do not establish accurate lesion boundaries.

@@ -47,15 +47,24 @@ def system_info() -> dict:
     return info
 
 
+def mlx_device_name():
+    """Explicit policy, available without importing MLX (including offline identities)."""
+    selected = os.environ.get("OCT_MLX_DEVICE")
+    if selected is None:
+        selected = "gpu" if platform.system() == "Darwin" and platform.machine().lower() == "arm64" else "cpu"
+    if selected not in ("cpu", "gpu"):
+        raise ValueError("OCT_MLX_DEVICE must be cpu or gpu")
+    return selected
+
+
 def require_mlx() -> None:
-    if platform.system() != "Darwin" or platform.machine().lower() != "arm64":
-        raise RuntimeError("Model execution requires native arm64 Python on Apple Silicon. On Windows use --stage inspect and python -m pytest.")
+    selected = mlx_device_name()
     try:
         import mlx.core as mx
         import mlx.nn  # noqa: F401
         import mlx.optimizers  # noqa: F401
-    except ImportError as exc:
-        raise RuntimeError("Optional MLX experiment is missing. Install requirements-mlx.txt in a separate Mac environment; use oct.py for the portable baseline.") from exc
-    if not mx.metal.is_available():
-        raise RuntimeError("MLX Metal is unavailable; check native Python and macOS compatibility.")
-    mx.set_default_device(mx.gpu)
+    except (ImportError, OSError) as exc:
+        raise RuntimeError("MLX runtime unavailable. For CPU install requirements-mlx-cpu.txt in a separate environment; Windows needs both mlx and mlx-cpu.") from exc
+    if selected == "gpu" and not mx.metal.is_available():
+        raise RuntimeError("MLX Metal is unavailable. Set OCT_MLX_DEVICE=cpu to use the installed CPU backend.")
+    mx.set_default_device(mx.cpu if selected == "cpu" else mx.gpu)

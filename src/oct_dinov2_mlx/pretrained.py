@@ -32,10 +32,16 @@ def check_device(device="cpu"):
     return torch
 
 
-def identity_for(config, device="cpu"):
+def identity_for(config, device="cpu", backend="torch"):
     identity = model_identity(config["model"])
-    identity.update(implementation="transformers==4.57.6", torch_version=version("torch"),
-                    adapter_version=1, device=device, training="none: frozen pretrained baseline")
+    if backend == "torch":
+        # Preserve existing PyTorch identities independently of optional MLX installation.
+        identity.pop("mlx_version", None)
+        identity.pop("execution_device", None)
+        identity.update(implementation="transformers==4.57.6", torch_version=version("torch"),
+                        adapter_version=1, device=device, training="none: frozen pretrained baseline")
+    elif backend != "mlx":
+        raise ValueError("backend must be torch or mlx")
     return feature_identity(identity, preprocessing_identity(config["preprocessing"]),
                             True, config["features"]["patch_dtype"])
 
@@ -57,7 +63,9 @@ class PretrainedExtractor:
         self.device, self.image_size = device, image_size
         self.metadata = {**model_identity(config), "implementation": "transformers==4.57.6",
                          "torch_version": torch.__version__, "device": device,
-                         "training": "none: frozen pretrained baseline"}
+                         "training": "none: frozen pretrained baseline", "adapter_version": 1}
+        self.metadata.pop("mlx_version", None)
+        self.metadata.pop("execution_device", None)
 
     def extract(self, images):
         import torch
@@ -74,10 +82,18 @@ class PretrainedExtractor:
         return {"cls": tokens[:, 0].copy(), "patches": tokens[:, 1:].copy()}
 
 
-def run(config, device="cpu"):
-    check_device(device)  # Validate before any dataset/model download.
+def run(config, device="cpu", backend="torch"):
+    if backend == "mlx":
+        from .common import require_mlx, mlx_device_name
+        require_mlx()
+        if mlx_device_name() != device:
+            raise ValueError("MLX device policy differs from the requested extraction device")
+    elif backend == "torch":
+        check_device(device)
+    else:
+        raise ValueError("backend must be torch or mlx")
     datasets, summary = prepare_data(config)
-    identity = identity_for(config, device)
+    identity = identity_for(config, device, backend)
     output = Path(config["runtime"]["output_dir"])
     output.mkdir(parents=True, exist_ok=True)
     manifest_path = output / "features_manifest.json"
@@ -88,8 +104,12 @@ def run(config, device="cpu"):
     shared = []
     def factory():
         if not shared:
-            print(f"Loading verified pretrained DINOv2 on {device}...", flush=True)
-            shared.append(PretrainedExtractor(config["model"], config["preprocessing"]["image_size"], device))
+            print(f"Loading verified pretrained DINOv2 with {backend} on {device}...", flush=True)
+            if backend == "mlx":
+                from .backbone import DINOv2Extractor
+                shared.append(DINOv2Extractor(config["model"], config["preprocessing"]["image_size"]))
+            else:
+                shared.append(PretrainedExtractor(config["model"], config["preprocessing"]["image_size"], device))
         return shared[0]
     indices, stats = {}, {}
     for split, dataset in datasets.items():

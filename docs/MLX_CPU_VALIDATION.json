@@ -1,0 +1,94 @@
+{
+  "self_test": {
+    "batch_vs_single_max_error": {
+      "cls": 1.0609626770019531e-05,
+      "patches": 6.67572021484375e-05
+    },
+    "core_matmul_and_gradient_passed": true,
+    "device": "Device(cpu, 0)",
+    "framework": "MLX",
+    "images": 2,
+    "model": {
+      "adapter_version": 2,
+      "architecture": "dinov2_vits14",
+      "compute_dtype": "float32",
+      "embedding_dim": 384,
+      "execution_device": "cpu",
+      "implementation": "mlx-vlm==0.7.6",
+      "mlx_version": "0.32.4",
+      "patch_size": 14,
+      "register_tokens": 0,
+      "repo_id": "facebook/dinov2-small",
+      "revision": "ed25f3a31f01632728cabb09d1542f84ab7b0056",
+      "tensor_count_mlx": 175,
+      "weights_sha256": "ae1e99fcefd534ed978cdeb8326f08030c96e28b7a81ffcbc98a857c84d14be1"
+    },
+    "passed": true,
+    "real_pretrained_weights": true,
+    "shapes": {
+      "cls": [
+        2,
+        384
+      ],
+      "patches": [
+        2,
+        256,
+        384
+      ]
+    },
+    "synthetic_inputs": true,
+    "system": {
+      "machine": "AMD64",
+      "packages": {
+        "Pillow": "13.0.0",
+        "kagglehub": "1.0.3",
+        "mlx": "0.32.4",
+        "mlx-vlm": "0.7.6",
+        "numpy": "2.5.4",
+        "safetensors": "0.8.0",
+        "scikit-learn": "1.9.1",
+        "torch": null,
+        "transformers": "5.22.1"
+      },
+      "platform": "Windows-11-10.0.26300-SP0",
+      "python": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+    }
+  },
+  "pytorch_comparison": {
+    "reference": "PyTorch 2.9.1 / Transformers 4.57.6 CPU",
+    "candidate": "MLX 0.32.4 / MLX-VLM 0.7.6 CPU",
+    "inputs": "same two deterministic artificial images and preprocessing",
+    "atol": 0.0005,
+    "rtol": 0.001,
+    "results": {
+      "cls": {
+        "max_abs_error": 2.6345252990722656e-05,
+        "passed": true
+      },
+      "patches": {
+        "max_abs_error": 9.894371032714844e-05,
+        "passed": true
+      }
+    }
+  },
+  "real_oct_smoke": {
+    "images": 12,
+    "split_counts": {
+      "train": 4,
+      "val": 4,
+      "test": 4
+    },
+    "dataset_downloaded": false,
+    "repeat_run_reused_all": true
+  },
+  "native_test_result": {
+    "passed": 7,
+    "elapsed_seconds": 62.42
+  },
+  "complete_suite": {
+    "passed": 84,
+    "skipped": 2,
+    "elapsed_seconds": 103.36,
+    "skips": "separate PyTorch baseline opt-in tests"
+  }
+}
