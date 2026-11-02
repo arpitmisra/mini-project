@@ -2,7 +2,7 @@
 
 ## One-minute status
 
-The default implementation is now **frozen pretrained DINOv2 → cached dense features**. It is a baseline for later adaptation comparisons, not a lesion segmenter. Real checkpoint inference, 12 local OCT scans, array export and cache reuse are tested on Windows CPU; see [VALIDATION.md](VALIDATION.md) for CI/platform evidence. The earlier Mac traceback is unavailable, so we cannot claim to have identified its exact cause.
+The default implementation is now **frozen pretrained DINOv2 → cached dense features**. It is a baseline for later adaptation comparisons, not a lesion segmenter. Real checkpoint inference, 12 local OCT scans, array export and cache reuse are tested locally on Windows CPU. Real-model CI also passed on macOS, Windows and Linux CPU; see [VALIDATION.md](VALIDATION.md). The earlier Mac traceback is unavailable, so we cannot claim to have identified its exact cause.
 
 The Mac setup now uses:
 ```bash

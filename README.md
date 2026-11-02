@@ -69,7 +69,8 @@ This can download the **entire dataset**. Use `bash oct.sh test` for the initial
    Use a different run folder for a different device; cache identities remain separate.
 
 The professor's earlier traceback was unavailable, so its exact cause is not established.
-See [tested platforms and evidence](docs/VALIDATION.md); tests establish software behavior, not segmentation quality.
+The real-model workflow passed on macOS, Windows and Linux CPU. See [evidence](docs/VALIDATION.md).
+These tests establish software behavior, not segmentation quality; MPS is a separate optional test.
 
 ## Details when needed
 

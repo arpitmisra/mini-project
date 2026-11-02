@@ -13,7 +13,9 @@ Executed locally on Windows AMD64 / Python 3.14.5:
 - Tests with `OCT_TEST_BASELINE=1`: **75 passed, 2 optional MLX modules skipped**. Real-checkpoint tests cover bounded synthetic dataset extraction, export, correct patch/grid indexing, repeat cache reuse and batch consistency. An initial test-only float16 standard-deviation warning was corrected by measuring that statistic in float32.
 - Companion rank/SVD/LoRA numerical examples executed and assertions passed.
 
-The new GitHub workflow runs actual pretrained CPU inference and end-to-end tests on Windows, Linux and macOS. Its Mac job uses `bash oct.sh setup` and `bash oct.sh test`, matching the user instructions. Consult the workflow result for the exact published commit; a workflow definition is not proof of execution.
+
+**Published code verification:** commit `f591e7daca75ff80e97ba2a05199efb9098d598b` passed the [real pretrained workflow](https://github.com/arpitmisra/mini-project/actions/runs/41374653197) on **macOS, Windows and Linux CPU**. All three jobs completed successfully. The macOS job installed through `bash oct.sh setup`, ran `bash oct.sh test`, and ran the full suite with the actual baseline integration tests enabled. This is actual Mac-runner execution, not a dependency dry run or an inference from Windows results. MPS acceleration and the professor's particular machine remain unverified. The subsequent documentation-only commit does not change the tested code.
+
 
 These checks do **not** establish segmentation accuracy, improvement from adaptation, patient independence, full-dataset runtime, or MPS/GPU correctness. CPU execution on a Mac runner also does not establish that the professor's particular installation has passed. The quick-start self-test is the local acceptance check.
 
