@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-14]
+        os: [windows-latest, macos-15]
     env:
       OCT_MLX_DEVICE: cpu
       OCT_TEST_MLX: '1'

@@ -24,7 +24,7 @@ def model_identity(config):
         runtime_version = version("mlx")
     except PackageNotFoundError:
         runtime_version = None
-    return {"repo_id": MODEL_REPO, "revision": MODEL_REVISION, "weights_sha256": MODEL_SHA256, "architecture": "dinov2_vits14", "embedding_dim": 384, "patch_size": 14, "register_tokens": 0, "implementation": f"mlx-vlm=={MLX_VLM_VERSION}", "adapter_version": 2, "compute_dtype": "float32", "mlx_version": runtime_version, "execution_device": mlx_device_name()}
+    return {"repo_id": MODEL_REPO, "revision": MODEL_REVISION, "weights_sha256": MODEL_SHA256, "architecture": "dinov2_vits14", "embedding_dim": 384, "patch_size": 14, "register_tokens": 0, "implementation": f"mlx-vlm=={MLX_VLM_VERSION}", "adapter_version": 3, "compute_dtype": "float32", "mlx_version": runtime_version, "execution_device": mlx_device_name()}
 
 
 def validate_hf_config(config):
@@ -96,10 +96,10 @@ def check_native_implementation():
 def native_model(hf_config):
     check_native_implementation()
     from mlx_vlm.models.dinov2.config import ModelConfig
-    from mlx_vlm.models.dinov2.dinov2 import Model
+    from .mlx_model import DifferentiableDINOv2
     validate_hf_config(hf_config)
     allowed = {f.name for f in fields(ModelConfig)}
-    return Model(ModelConfig(**{k: v for k, v in hf_config.items() if k in allowed}))
+    return DifferentiableDINOv2(ModelConfig(**{k: v for k, v in hf_config.items() if k in allowed}))
 
 
 class DINOv2Extractor:

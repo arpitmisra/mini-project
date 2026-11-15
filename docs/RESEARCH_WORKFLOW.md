@@ -141,6 +141,8 @@ The teacher uses EMA of the trainable parameters: LoRA factors and heads in LoRA
 
 SSL heads use a separate `seed+1` initialization stream so that drawing LoRA factors cannot change the comparison's head initialization. View sampling/masks share the same seed and settings. Original feature caches cannot train internal adapters; after adaptation, new checkpoint identities cause new dense caches. Repeating a completed matching run reuses the checkpoint and features.
 
+The MLX adapter now uses differentiable bicubic interpolation for positional embeddings on both CPU and Apple GPU. The upstream automatic Metal interpolation kernel had no gradient implementation, breaking full fine-tuning on Macs. Adapter/training-contract version 3 records this correction. Older MLX runs are retained as historical outputs; start a new folder instead of resuming them, for example `bash oct.sh finetune "$HOME/Downloads/OCT2017" --mode lora --output-dir outputs/lora-v3`. Existing PyTorch baseline caches are unaffected.
+
 ## 6. Full research comparison, after checks pass
 
 Append `--full` to each fine-tuning command to use the full configuration (five epochs, no step cap). This can be expensive on CPU. Full mode permits Kaggle fallback if the local path is unavailable, so use `--offline` when the local dataset and model are already present. Full outputs use the suffix `-full`; do not confuse `--mode full` (all backbone parameters) with `--full` (full experiment size).

@@ -25,6 +25,7 @@ The default is pretrained extraction. The historical package name contains `mlx`
 | `src/oct_dinov2_mlx/cli.py` | test/run/show commands, bounded baseline defaults, reusable sample export and error logging. |
 | `src/oct_dinov2_mlx/pretrained.py` | Strict pretrained HF/PyTorch loading, CPU/MPS/CUDA selection, frozen extraction, caching and real-model self-test. |
 | `src/oct_dinov2_mlx/backbone.py` | Pinned model revision/hash/schema and original MLX extractor; shared checkpoint validation is reused by the baseline. |
+| `src/oct_dinov2_mlx/mlx_model.py` | Differentiable positional-embedding resizing for MLX CPU and Apple GPU; preserves native checkpoint names. |
 | `src/oct_dinov2_mlx/pipeline.py` | Shared data preparation plus earlier MLX adaptation/extraction orchestration. |
 | `src/oct_dinov2_mlx/config.py` | YAML validation and path/environment overrides. |
 | `src/oct_dinov2_mlx/common.py` | Hashing, atomic JSON, environment records and optional MLX platform check. |
@@ -51,6 +52,7 @@ The default is pretrained extraction. The historical package name contains `mlx`
 | `tests/test_handoff.py` | Platform/config errors, relative caches and removed classifier stages. |
 | `tests/test_adaptation.py` | Portable contracts, augmentations and earlier adaptation routing. |
 | `tests/test_mlx.py` | Optional native MLX model and actual adapted integration; opt in with OCT_TEST_MLX. |
+| `tests/test_mlx_positions.py` | Independent cubic interpolation/gradient reference and a regression test preventing dispatch to a Metal kernel without gradients. |
 | `tests/test_mlx_finetuning.py` | Optional native gradient/loss/EMA/resume checks. |
 | `.github/workflows/portable-tests.yml` | Windows/Linux offline portable regression tests. |
 | `.github/workflows/baseline-tests.yml` | Real checkpoint inference and extraction tests on Windows/Linux/macOS CPU; Mac uses the user-facing setup wrapper. |

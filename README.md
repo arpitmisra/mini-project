@@ -92,5 +92,6 @@ Normalization-ablation folders replace `imagenet` with `unit`. Actual dataset fe
 - **What was actually tested:** [Validation evidence](docs/VALIDATION.md).
 - **Mathematics and research background:** [Study guide](docs/STUDY_GUIDE.md).
 - **A command failed?** Send the command and `outputs/research-error.log` for `inspect`/`finetune`, or `outputs/last-error.log` for `test`/`run`/`show`. For setup errors, copy Terminal's error message.
+- **Updating an older MLX experiment?** Add a new folder, for example `--output-dir outputs/lora-v3`. Old checkpoints cannot resume across the Mac fine-tuning correction; your old files are kept.
 
 Start with the small checks above. Full-dataset runs require `--full`; they may download the dataset through KaggleHub if the local path is unavailable. Add `--offline` when both dataset and model are already local. `--mode full` selects all backbone parameters; `--full` selects a full-sized experiment.
