@@ -4,7 +4,19 @@ Handoff review: the README now follows five sequential steps. Bash syntax valida
 
 The follow-up found a real Mac fine-tuning failure in the earlier CI run: the upstream positional resize dispatched to a custom Metal kernel without a VJP. The local adapter now uses differentiable gathers and weighted sums. Independent float64 cubic interpolation/adjoint tests verify values and gradients at three output sizes; another test forces Metal availability and rejects any custom-kernel dispatch. After this fix, the complete opted-in MLX suite passed: **100 passed, 2 skipped, 61.58 seconds** on Windows CPU. Real full and LoRA integration executed; the two separate baseline integration tests were intentionally not enabled in the MLX environment. Version 3 of the adapter/training contract separates these results from older MLX checkpoints and caches.
 
-Published commit `9c1c84b` passed baseline checks on Windows/Linux, portable tests on both, and MLX CPU checks on Windows. Its Mac jobs did not start because the runner was retired. Both workflows now use the supported `macos-15` Apple Silicon runner; the corrected Mac run is being verified separately. A fresh clone of `9c1c84b` also passed the real pretrained self-test and random-noise dashboard locally, using the existing baseline interpreter and cached model.
+**Published code commit `96bec10504bb285a0415f100b16001e3c773c4c6` passed all three workflows:**
+
+| Workflow | Actual results |
+|---|---|
+| [Real pretrained baseline](https://github.com/arpitmisra/mini-project/actions/runs/43724574199) | macOS 15 ARM64, Windows and Linux CPU passed. Mac installation uses `bash oct.sh setup`; self-test, extraction/export/cache tests and attention inspection executed. |
+| [Real MLX CPU](https://github.com/arpitmisra/mini-project/actions/runs/43724574195) | macOS 15 ARM64: **100 passed, 2 skipped in 24.52 s**. Windows: **100 passed, 2 skipped in 31.92 s**. Both passed dependency checks, real pretrained self-test and attention/normalization inspection. Full and LoRA adaptation integration tests executed. |
+| [Portable tests](https://github.com/arpitmisra/mini-project/actions/runs/43724574221) | Windows and Linux passed. |
+
+The two MLX-suite skips are PyTorch baseline integration tests, executed in the separate baseline workflow. CI uses generated small image fixtures, not the full OCT dataset. This establishes the CPU path on a real Apple Silicon runner; it does not test the professor's exact machine or Apple GPU training. These records were added in a documentation-only follow-up to the tested code commit.
+
+Published commit `9c1c84b` passed baseline checks on Windows/Linux, portable tests on both, and MLX CPU checks on Windows. Its Mac jobs did not start because the runner was retired. Both workflows now use the supported `macos-15` Apple Silicon runner. A fresh clone of `9c1c84b` also passed the real pretrained self-test and random-noise dashboard locally, using the existing baseline interpreter and cached model.
+
+After the version-3 correction, all four real local OCT conditions were rerun successfully without downloads: `outputs/research-validation/v3-{lora,full}-{imagenet,unit}/`. Each did one training step and extracted 12 scans. Initial losses match across LoRA/full within each condition (9.057210 for imagenet; 8.932680 for unit). Export via `oct.py show` succeeded for the new LoRA run. Corrected MLX attention/features for the same OCT scan again matched the separately computed PyTorch reference at atol=5e-4, rtol=1e-3; maximum attention difference 1.365e-5 and maximum patch difference 2.270e-4. Evidence is saved locally in `outputs/research-validation/v3-parity.json` and `v3-inspection-oct/`.
 
 Executed on the local Windows CPU, with the previously installed separate baseline and MLX environments. No dataset or pretrained-weight download was performed. These are software checks, not evidence of improved segmentation.
 
@@ -19,4 +31,4 @@ Executed on the local Windows CPU, with the previously installed separate baseli
 
 The first LoRA export exposed expected numerical differences from merging matrix operations. The code now checks merge agreement with a documented float32 tolerance separately from strict serialization agreement of the merged model. Another review caught LoRA RNG consumption changing SSL-head initialization; the implementation now seeds heads independently and records the new training-contract version.
 
-CI includes the new attention/normalization inspection on Windows/Linux/macOS baseline and Windows/macOS MLX CPU. These added remote jobs have not been claimed as passed based on local results. Apple GPU training, full-dataset throughput, convergence, segmentation accuracy and patient independence remain unverified by these smoke checks.
+Apple GPU training, full-dataset throughput, convergence, segmentation accuracy and patient independence remain unverified by these smoke checks.

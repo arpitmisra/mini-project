@@ -4,7 +4,7 @@ Extract spatial features from OCT scans, inspect patch attention, and compare **
 
 ## 1. Set up on your Mac — once
 
-Use **Python 3.12** and Git. For MLX fine-tuning, use native Python on an **Apple Silicon Mac (M1 or newer)**. Open Terminal and run:
+Use **Python 3.12** and Git. For MLX fine-tuning, use native Python on an **Apple Silicon Mac (M1 or newer), with macOS 15 or newer**. Open Terminal and run:
 
 ```bash
 git clone https://github.com/arpitmisra/mini-project.git
