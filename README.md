@@ -1,7 +1,8 @@
 # OCT → DINOv2 dense features
 
 **Start here.** This version extracts features from **frozen pretrained DINOv2 ViT-S/14**.
-It does not fine-tune, train a classifier or produce lesion segmentation masks.
+The default extraction does not train a classifier or produce lesion segmentation masks.
+Optional commands below inspect attention and compare self-supervised LoRA/full adaptation.
 
 ## Mac: copy these commands in order
 
@@ -72,12 +73,45 @@ The professor's earlier traceback was unavailable, so its exact cause is not est
 The real-model workflow passed on macOS, Windows and Linux CPU. See [evidence](docs/VALIDATION.md).
 These tests establish software behavior, not segmentation quality; MPS is a separate optional test.
 
-## Details when needed
+## Patch dashboard, normalization and fine-tuning
+
+After the baseline setup, inspect any local image (no OCT dataset needed):
+
+```bash
+bash oct.sh inspect "/path/to/scan.jpeg" --output-dir outputs/my-scan
+open outputs/my-scan/dashboard.html
+```
+
+Click a patch; switch among attention heads, cosine similarity and Pearson correlation.
+The same dashboard compares pretrained mean/std normalization with RGB / 255 only.
+It saves exact arrays and a numerical comparison; these are not lesion masks.
+Omit the image path for a deterministic random-noise sanity check:
+
+```bash
+bash oct.sh inspect --output-dir outputs/noise-check
+```
+
+To test both adaptation methods, install their separate MLX environment once:
+
+```bash
+bash oct.sh setup-mlx
+bash oct.sh finetune "/path/to/OCT2017" --mode lora
+bash oct.sh finetune "/path/to/OCT2017" --mode full
+```
+
+Each is a **one-step CPU smoke check**, followed by dense extraction for at most 12 local scans.
+No dataset download occurs. Both use self-supervised teacher–student training on TRAIN only.
+Use `--normalization unit` for the matched normalization ablation; use `--full` only for an intentional full experiment.
+See [the research runbook](docs/RESEARCH_WORKFLOW.md) for Windows commands, checkpoint inspection,
+exact normalization code, saved array meanings and the controlled comparison protocol.
+
+## More documentation
 
 - [Full instructions, Windows commands and array loading](docs/USAGE.md)
 - [What every project file does](docs/FILES.md)
 - [Study guide: rank → SVD → LoRA/PEFT → Swin → weakly supervised OCT segmentation](docs/STUDY_GUIDE.md)
 - [Meeting agenda and proposed experiments](docs/MEETING.md)
+- [Patch inspection, normalization and LoRA/full fine-tuning](docs/RESEARCH_WORKFLOW.md)
 - [Run the actual MLX DINOv2 code on a Windows or Mac CPU](docs/MLX_CPU.md)
 - [Optional MLX adaptation experiment](docs/FINETUNING.md)
 

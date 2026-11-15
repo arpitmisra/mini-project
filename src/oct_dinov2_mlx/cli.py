@@ -76,8 +76,14 @@ def show(output_dir, split="test", sample_id=None, all_values=False):
 
 
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in ("inspect", "finetune"):
+        from .research_cli import main as research_main
+        return research_main(argv)
     parser = argparse.ArgumentParser(description="Extract and view dense features with frozen pretrained DINOv2. No training.")
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("inspect", help="Inspect any image: attention, patch relationships and normalization")
+    commands.add_parser("finetune", help="MLX teacher/student adaptation: LoRA or full backbone")
     execute = commands.add_parser("run", help="Extract a 12-image local sample; add --full for all images")
     execute.add_argument("dataset", nargs="?", help="Local OCT directory (quote paths with spaces); otherwise use OCT_DATASET_PATH/default")
     execute.add_argument("--offline", action="store_true", help="Prohibit dataset and pretrained-weight downloads")

@@ -8,7 +8,15 @@ STD = (0.229, 0.224, 0.225)
 
 
 def preprocessing_identity(config):
-    return {**config, "algorithm": "rgb-bicubic-shortest-center-crop-v1", "mean": MEAN, "std": STD, "layout": "NHWC", "pillow_version": pillow_version}
+    config = dict(config)
+    mode = config.pop("normalization", "imagenet")
+    if mode not in ("imagenet", "unit"):
+        raise ValueError("normalization must be imagenet or unit")
+    identity = {**config, "algorithm": "rgb-bicubic-shortest-center-crop-v1", "mean": MEAN, "std": STD, "layout": "NHWC", "pillow_version": pillow_version}
+    # Preserve existing normalized cache identities; the ablation has its own identity.
+    if mode == "unit":
+        identity.update(normalization="unit", mean=(0., 0., 0.), std=(1., 1., 1.))
+    return identity
 
 
 def resize_rgb(image: Image.Image, resize_shortest=256):
@@ -23,15 +31,19 @@ def resize_rgb(image: Image.Image, resize_shortest=256):
     return image.resize(target, Image.Resampling.BICUBIC)
 
 
-def normalize_rgb(image):
+def normalize_rgb(image, normalization="imagenet"):
     x = np.asarray(image, dtype=np.float32) / np.float32(255)
+    if normalization == "unit":
+        return np.ascontiguousarray(x)
+    if normalization != "imagenet":
+        raise ValueError("normalization must be imagenet or unit")
     return np.ascontiguousarray((x - np.array(MEAN, np.float32)) / np.array(STD, np.float32))
 
 
-def preprocess(image: Image.Image, image_size=224, resize_shortest=256) -> np.ndarray:
+def preprocess(image: Image.Image, image_size=224, resize_shortest=256, normalization="imagenet") -> np.ndarray:
     """HF checkpoint preprocessing: RGB, shortest-side bicubic, center crop, normalize."""
     if resize_shortest < image_size:
         raise ValueError("Invalid image or preprocessing dimensions")
     image = resize_rgb(image, resize_shortest)
     left, top = (image.width - image_size) // 2, (image.height - image_size) // 2
-    return normalize_rgb(image.crop((left, top, left + image_size, top + image_size)))
+    return normalize_rgb(image.crop((left, top, left + image_size, top + image_size)), normalization)

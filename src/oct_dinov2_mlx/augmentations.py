@@ -24,7 +24,7 @@ def paired_views(image, preprocessing, rng, strength=0.2):
             view = ImageEnhance.Contrast(view).enhance(float(rng.uniform(1 - amount, 1 + amount)))
             if target is student and amount > 0 and rng.random() < 0.5:
                 view = view.filter(ImageFilter.GaussianBlur(float(rng.uniform(0.1, 1.0))))
-            target.append(normalize_rgb(view))
+            target.append(normalize_rgb(view, preprocessing.get("normalization", "imagenet")))
     return np.stack(teacher), np.stack(student)
 
 

@@ -1,4 +1,6 @@
-# Meeting notes — 2 November 2026
+# Meeting notes — updated 15 November 2026
+
+New working tools: `oct.py inspect` generates a patch attention/similarity dashboard and input-normalization comparison. `oct.py finetune --mode lora` and `--mode full` share the self-supervised teacher/student objective. Four one-step local OCT conditions passed on Windows MLX CPU; this does not establish efficacy. See [research workflow](RESEARCH_WORKFLOW.md) and [current validation](RESEARCH_VALIDATION.md).
 
 ## One-minute status
 

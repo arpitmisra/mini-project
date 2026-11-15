@@ -48,6 +48,15 @@ def load_config(path, local_path=None, output_dir=None) -> dict:
     if fraction is not None and (type(fraction) not in (int, float) or not math.isfinite(fraction) or not 0 < fraction < 1):
         raise ValueError("validation_fraction must be between 0 and 1")
     size = cfg["preprocessing"]["image_size"]
+    if cfg["preprocessing"]["normalization"] not in ("imagenet", "unit"):
+        raise ValueError("preprocessing.normalization must be imagenet or unit")
+    if cfg["finetuning"]["mode"] not in ("full", "lora"):
+        raise ValueError("finetuning.mode must be full or lora")
+    rank, alpha = cfg["finetuning"]["lora_rank"], cfg["finetuning"]["lora_alpha"]
+    if type(rank) is not int or not 1 <= rank <= 384:
+        raise ValueError("lora_rank must be an integer from 1 to 384")
+    if type(alpha) not in (int, float) or not math.isfinite(alpha) or alpha <= 0:
+        raise ValueError("lora_alpha must be positive and finite")
     shortest = cfg["preprocessing"]["resize_shortest"]
     if type(size) is not int or type(shortest) is not int or size < 14 or size % 14 or shortest < size:
         raise ValueError("image_size must be a multiple of 14; resize_shortest must be at least image_size")

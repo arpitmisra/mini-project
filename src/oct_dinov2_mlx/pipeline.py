@@ -12,7 +12,7 @@ import numpy as np
 
 from .backbone import DINOv2Extractor, model_identity
 from .cache import FeatureCache, extract_cached, feature_identity
-from .common import require_mlx, system_info, write_json
+from .common import require_mlx, system_info, write_json, digest
 from .config import ROOT, load_config
 from .data import KermanyOCTDataset, Record, check_split_integrity, derive_validation, resolve_dataset
 from .adaptation import adapted_identity, read_adapted_checkpoint
@@ -102,6 +102,8 @@ def run(config, stage="all", checkpoint_path=None):
         from .finetuning import finetune
         checkpoint = finetune(datasets["train"], config, output)
     adaptation = read_adapted_checkpoint(checkpoint, config["model"])
+    if digest(adaptation["contract"]["preprocessing"]) != digest(preprocessing_identity(config["preprocessing"])):
+        raise ValueError("Extraction preprocessing must match the adapted checkpoint's training preprocessing")
     # A rejected/reconfigured run must not overwrite the earlier run's provenance.
     write_json(output / ("extraction_dataset_summary.json" if stage == "extract" else "dataset_summary.json"), dataset_summary)
     write_json(output / ("extraction_config.resolved.json" if stage == "extract" else "config.resolved.json"), config)

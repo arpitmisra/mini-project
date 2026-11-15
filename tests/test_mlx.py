@@ -68,13 +68,15 @@ def test_real_pretrained_extractor():
 
 @pytest.mark.pretrained
 @pytest.mark.skipif(os.environ.get("OCT_TEST_PRETRAINED") != "1", reason="Explicit pretrained integration opt-in required")
-def test_pretrained_end_to_end_and_cache_reuse(oct_root, tmp_path, monkeypatch):
+@pytest.mark.parametrize("mode", ["full", "lora"])
+def test_pretrained_end_to_end_and_cache_reuse(oct_root, tmp_path, monkeypatch, mode):
     from oct_dinov2_mlx.config import ROOT, load_config
     from oct_dinov2_mlx import pipeline
     config = load_config(ROOT / "configs/smoke_test.yaml", str(oct_root), str(tmp_path / "run"))
     config["dataset"]["max_per_class"] = 1
     config["features"]["cache_dir"] = str(tmp_path / "features")
     config["finetuning"]["epochs"] = 1
+    config["finetuning"]["mode"] = mode
     config["finetuning"]["max_steps_per_epoch"] = 1
     first = pipeline.run(config)
     assert first["extraction"]["test"]["extracted"] == 4

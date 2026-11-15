@@ -3,8 +3,9 @@
 ## What changed
 
 The default `oct.py`/`oct.sh` flow now uses frozen pretrained DINOv2 through PyTorch/Transformers.
-The earlier `run_pipeline.py` MLX adaptation code remains an optional experiment. Its full fine-tuning is
-not LoRA, and is not invoked by the baseline. No segmentation decoder or weak-label training is implemented yet.
+The optional MLX adaptation now supports full and query/value LoRA training through `oct.py finetune`.
+The default baseline does not train. No segmentation decoder or weak-label training is implemented yet.
+See [RESEARCH_WORKFLOW.md](RESEARCH_WORKFLOW.md) for attention dashboards and normalization experiments.
 
 Pinned baseline engines: torch 2.9.1, transformers 4.57.6. The original model revision and weight SHA-256
 are checked before strict loading. Arbitrary remote code and random-weight fallback are not used.

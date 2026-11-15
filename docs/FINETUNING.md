@@ -1,6 +1,6 @@
 > CPU execution is now supported on the Windows MLX runtime too. See [MLX_CPU.md](MLX_CPU.md); older Apple-only validation statements below describe the earlier implementation.
 
-> Optional earlier MLX experiment. The current default is frozen pretrained extraction; see [README](../README.md) and [USAGE](USAGE.md). Install `requirements-mlx.txt` in a separate environment. Native tests require `OCT_TEST_MLX=1`. No LoRA or segmentation training is implemented here.
+> Optional MLX experiment: full and LoRA modes now share the objective below. See [RESEARCH_WORKFLOW](RESEARCH_WORKFLOW.md) for simple commands and the LoRA/normalization protocol. Install `requirements-mlx-cpu.txt` in a separate environment. Native tests require `OCT_TEST_MLX=1`. No segmentation training is implemented here.
 
 # Self-supervised OCT adaptation method
 
@@ -8,9 +8,9 @@ The user selected self-supervised teacher–student adaptation. The aim is to ad
 
 ## Exact implemented objective
 
-The initialization is the pinned Meta `facebook/dinov2-small` checkpoint, verified by the original SHA-256 and complete HF/native parameter schemas. All student backbone parameters are trainable, including transformer blocks, patch embedding, positions, normalization and mask token. A teacher starts with the same backbone and projection-head parameters and has no gradient updates.
+The initialization is the pinned Meta `facebook/dinov2-small` checkpoint, verified by the original SHA-256 and complete HF/native parameter schemas. Full mode trains all student backbone parameters. LoRA mode trains query/value adapters in each block and freezes the original backbone, including the mask token. Both train the same temporary SSL heads. A teacher starts with identical parameters and has no gradient updates. In LoRA mode only factors and heads receive EMA updates; base weights remain unchanged.
 
-Each training image yields two random 224 × 224 crops after aspect-preserving shortest-edge resize to 256. For a given crop, teacher and student share pixel coordinates. They receive different mild brightness/contrast perturbations; student views may be blurred. Crops are not vertically flipped or rotated. The student replaces a random fraction of patch embeddings with the trainable mask token; the teacher sees the complete crop.
+Each training image yields two random 224 × 224 crops after aspect-preserving shortest-edge resize to 256. For a given crop, teacher and student share pixel coordinates. They receive different mild brightness/contrast perturbations; student views may be blurred. Crops are not vertically flipped or rotated. The student replaces a random fraction of patch embeddings with the mask token; the teacher sees the complete crop. Input normalization is applied after augmentation, consistently to both networks.
 
 Separate temporary global and patch projection heads map backbone features through a two-layer GELU MLP, L2-normalized bottleneck and row-normalized prototype weight matrix. Their output dimension is a self-supervised vocabulary (`prototypes`), not two diagnostic classes. Neither head is included in the final backbone export.
 

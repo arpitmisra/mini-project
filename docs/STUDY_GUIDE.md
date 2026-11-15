@@ -1,6 +1,6 @@
 # Study guide: rank, SVD, LoRA/PEFT, Swin and weakly supervised OCT segmentation
 
-Prepared for the discussion on 2 November 2026. This document separates mathematical facts, established methods and proposed experiments. The current default code extracts frozen pretrained DINOv2 features. It does **not** yet implement LoRA, Swin segmentation, pseudo-label training or a validated lesion segmenter. The earlier MLX self-supervised adaptation is a separate experiment.
+Prepared for the discussion on 2 November 2026; implementation status updated 15 November. This document separates mathematical facts, established methods and proposed experiments. The default extracts frozen pretrained DINOv2 features. Optional MLX self-supervised adaptation now supports LoRA and full fine-tuning, with an attention dashboard and input-normalization ablation; see [research workflow](RESEARCH_WORKFLOW.md). Swin segmentation, pseudo-label training and a validated lesion segmenter remain proposed work.
 
 For today's meeting read sections 1, 7, 9 and 12 first. Then work through the numerical examples. The dependency order is:
 
@@ -319,7 +319,7 @@ Compare frozen DINOv2 plus a fixed weak-label head against LoRA-DINOv2 plus the 
 
 Save exact base revision, target modules, rank, scale, adapter and task-head weights, preprocessing and training metadata. Compatible linear updates can be merged as $W_0+sBA$; test merged/unmerged numerical agreement. The base weights are still needed.
 
-The present code does not claim to implement this LoRA experiment. Low training loss would not establish lesion accuracy.
+The code now implements self-supervised query/value LoRA adaptation. The weak-label objective described here remains a proposed experiment. Low training loss would not establish lesion accuracy.
 
 ## 8. Swin Transformers
 

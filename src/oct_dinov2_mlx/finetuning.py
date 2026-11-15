@@ -88,8 +88,10 @@ def train_step(student, teacher, optimizer, centers, teacher_images, student_ima
     optimizer.update(student, tree_map(lambda g: g * scale, grads))
     mx.eval(student.parameters(), optimizer.state)
     momentum = settings["teacher_momentum"]
-    teacher.update(tree_map(lambda t, s: momentum * t + (1 - momentum) * s,
-                            teacher.parameters(), student.parameters()))
+    # Update only trainable student entries. Frozen LoRA base weights remain exact.
+    teacher_params = dict(tree_flatten(teacher.parameters()))
+    teacher.update(tree_unflatten([(key, momentum * teacher_params[key] + (1 - momentum) * value)
+                                  for key, value in tree_flatten(student.trainable_parameters())]))
     c = settings["center_momentum"]
     centers = {"cls": c * centers["cls"] + (1 - c) * mx.mean(t_cls, axis=0, keepdims=True),
                "patches": c * centers["patches"] + (1 - c) * mx.mean(t_patch, axis=(0, 1), keepdims=True)}
@@ -178,9 +180,12 @@ def finetune(train_dataset, config, output_dir):
         else:
             initial = DINOv2Extractor(config["model"], config["preprocessing"]["image_size"])
             backbone, hf_config = initial.model, initial.hf_config
-        backbone.unfreeze()
+        from .lora import configure_backbone, merged_parameters
+        configure_backbone(backbone, settings)
+        # Equal SSL heads across full/LoRA: adapter RNG draws must not change them.
+        mx.random.seed(config["runtime"]["seed"] + 1)
         student = SelfDistillationModel(backbone, settings)
-        teacher = SelfDistillationModel(native_model(hf_config), settings)
+        teacher = SelfDistillationModel(configure_backbone(native_model(hf_config), settings), settings)
         teacher.update(tree_map(lambda value: value, student.parameters()))
         teacher.freeze()
         teacher.eval()
@@ -193,7 +198,14 @@ def finetune(train_dataset, config, output_dir):
             history, first_epoch, steps = resume_meta["history"], resume_meta["epoch"], resume_meta["steps"]
             print(f"Resuming after completed epoch {first_epoch}")
         mx.eval(student.parameters(), teacher.parameters(), centers)
+        parameter_counts = {
+            "backbone_total": sum(v.size for _, v in tree_flatten(student.backbone.parameters())),
+            "backbone_trainable": sum(v.size for _, v in tree_flatten(student.backbone.trainable_parameters())),
+            "including_ssl_heads_trainable": sum(v.size for _, v in tree_flatten(student.trainable_parameters())),
+        }
+        write_json(directory / "parameter_counts.json", parameter_counts)
         before = dict(tree_flatten(student.backbone.parameters()))
+        trainable_keys = set(dict(tree_flatten(student.backbone.trainable_parameters())))
         teacher_before = dict(tree_flatten(teacher.backbone.parameters()))
         side = config["preprocessing"]["image_size"] // 14
         for epoch in range(first_epoch, settings["epochs"]):
@@ -223,6 +235,10 @@ def finetune(train_dataset, config, output_dir):
             changed = any(bool(mx.any(before[k] != v).item()) for k, v in tree_flatten(student.backbone.parameters()))
             if not changed:
                 raise RuntimeError("Backbone weights did not change; refusing to call this fine-tuning")
+            if settings.get("mode") == "lora":
+                for key, value in tree_flatten(student.backbone.parameters()):
+                    if key not in trainable_keys and bool(mx.any(before[key] != value).item()):
+                        raise RuntimeError(f"LoRA unexpectedly modified a frozen parameter: {key}")
             if not any(bool(mx.any(teacher_before[k] != v).item()) for k, v in tree_flatten(teacher.backbone.parameters())):
                 raise RuntimeError("EMA teacher backbone did not change; check learning rate and teacher momentum")
             save_resume(directory, epoch + 1, student, teacher, optimizer, centers, rng,
@@ -234,7 +250,8 @@ def finetune(train_dataset, config, output_dir):
         # Export only the EMA backbone. SSL projection heads are not feature outputs.
         teacher.backbone.eval()
         temporary = directory / f"backbone.{os.getpid()}.safetensors"
-        teacher.backbone.save_weights(str(temporary))
+        export_weights = merged_parameters(teacher.backbone)
+        mx.save_safetensors(str(temporary), export_weights)
         os.replace(temporary, final_path)
         restored = native_model(hf_config)
         restored.load_weights(str(final_path), strict=True)
@@ -242,10 +259,19 @@ def finetune(train_dataset, config, output_dir):
         restored.eval()
         with Image.open(train_dataset.records[0].image_path) as image:
             probe = mx.array(preprocess(image, **config["preprocessing"])[None])
-        expected = teacher.backbone.forward_features(probe)
+        # Merging changes floating-point operation order. Check that separately
+        # from the strict serialization round trip of the merged native model.
+        reference = native_model(hf_config)
+        reference.load_weights(list(export_weights.items()), strict=True)
+        reference.eval()
+        expected = reference.forward_features(probe)
+        factorized = teacher.backbone.forward_features(probe)
         actual = restored.forward_features(probe)
+        merge_errors = {}
         for key in ("x_norm_clstoken", "x_norm_patchtokens"):
-            mx.eval(expected[key], actual[key])
+            mx.eval(expected[key], actual[key], factorized[key])
+            np.testing.assert_allclose(np.asarray(expected[key]), np.asarray(factorized[key]), atol=5e-4, rtol=1e-3)
+            merge_errors[key] = float(np.max(np.abs(np.asarray(expected[key]) - np.asarray(factorized[key]))))
             np.testing.assert_allclose(np.asarray(actual[key]), np.asarray(expected[key]), atol=1e-6, rtol=1e-5)
         write_json(final_path.with_suffix(".json"), {
             "format_version": 1, "status": "complete", "method": METHOD,
@@ -255,6 +281,10 @@ def finetune(train_dataset, config, output_dir):
             "epochs_completed": settings["epochs"], "steps": steps, "history": history,
             "current_invocation_seconds": time.perf_counter() - started,
             "checkpoint_reload_verified": True,
+            "merge_max_abs_errors": merge_errors,
+            "parameter_counts": parameter_counts,
+            "adaptation_mode": settings.get("mode", "full"),
+            "ema_policy": "EMA of trainable factors and SSL heads; frozen weights unchanged" if settings.get("mode") == "lora" else "EMA of backbone and SSL heads",
             "scope": "Self-supervised OCT adaptation, not a reproduction of full DINOv2 pretraining",
         })
     return final_path

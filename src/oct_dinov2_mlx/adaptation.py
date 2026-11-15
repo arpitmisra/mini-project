@@ -20,6 +20,8 @@ def training_contract(config, records):
     except PackageNotFoundError:
         mlx_version = None  # Portable tests/inspection do not install MLX.
     return {
+        "implementation_version": 2,
+        "head_initialization": "seed+1 independent of adapter initialization",
         "method": METHOD, "base_model": model_identity(config["model"]),
         "preprocessing": preprocessing_identity(config["preprocessing"]),
         "finetuning": deepcopy(config["finetuning"]), "seed": config["runtime"]["seed"],

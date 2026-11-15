@@ -1,3 +1,7 @@
+# Latest research workflow validation
+
+See [15 November 2026 research validation](RESEARCH_VALIDATION.md) for actual attention inspection, normalization comparisons, LoRA/full local OCT checks, parameter counts and native tests. Earlier records below describe previous releases.
+
 # MLX CPU validation — 2 November 2026
 
 The earlier Apple-only restriction was incorrect for the current MLX release. Official MLX 0.32.4 and mlx-cpu 0.32.4 Windows wheels were installed in a dedicated environment. Runtime selection now supports CPU explicitly; the Mac Metal path remains selectable.

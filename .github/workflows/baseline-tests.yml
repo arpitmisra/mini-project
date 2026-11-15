@@ -45,6 +45,12 @@ jobs:
         env:
           OCT_TEST_BASELINE: '1'
         run: python -m pytest -q
+      - name: Mac real attention and normalization inspection
+        if: runner.os == 'macOS'
+        run: bash oct.sh inspect --offline --output-dir outputs/ci-inspection
+      - name: Windows/Linux real attention and normalization inspection
+        if: runner.os != 'macOS'
+        run: python oct.py inspect --offline --output-dir outputs/ci-inspection
       - name: Upload self-test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -53,3 +59,5 @@ jobs:
           path: |
             outputs/self-test/self_test.json
             outputs/last-error.log
+            outputs/ci-inspection/report.json
+            outputs/research-error.log

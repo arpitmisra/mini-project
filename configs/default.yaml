@@ -12,6 +12,7 @@ model:
   local_path: null
   allow_download: true
 preprocessing:
+  normalization: imagenet
   image_size: 224
   resize_shortest: 256
 features:
@@ -21,6 +22,9 @@ features:
   save_patches: true
   patch_dtype: float16
 finetuning:
+  mode: full
+  lora_rank: 8
+  lora_alpha: 8.0
   epochs: 5
   batch_size: 2
   learning_rate: 0.00001
