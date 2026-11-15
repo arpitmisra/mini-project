@@ -1,5 +1,7 @@
 # Local research workflow validation — 15 November 2026
 
+Handoff review: the README now follows five sequential steps. Bash syntax validation and 16 targeted launcher/CLI/inspection tests passed, including both `--backend mlx` and `--backend=mlx` and preservation of quoted paths. The broader MLX results below predate this documentation/launcher follow-up.
+
 Executed on the local Windows CPU, with the previously installed separate baseline and MLX environments. No dataset or pretrained-weight download was performed. These are software checks, not evidence of improved segmentation.
 
 - Entire opted-in MLX suite: **90 passed, 2 skipped**, 50.23 seconds. The skips are the separate PyTorch integration tests. Includes real pretrained full/LoRA adaptation, strict merged checkpoint reload, adapted extraction/cache reuse, native gradients/EMA/resume and new LoRA/normalization tests.

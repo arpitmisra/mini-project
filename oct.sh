@@ -3,7 +3,15 @@
 set -euo pipefail
 cd "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 env_python="$PWD/.venv-dense/bin/python"
-if [[ "${1:-}" == "finetune" || "${1:-}" == "setup-mlx" || " $* " == *" --backend mlx "* ]]; then
+use_mlx=false
+previous_arg=''
+for arg in "$@"; do
+  if [[ "$arg" == '--backend=mlx' || ( "$previous_arg" == '--backend' && "$arg" == 'mlx' ) ]]; then
+    use_mlx=true
+  fi
+  previous_arg="$arg"
+done
+if [[ "${1:-}" == "finetune" || "${1:-}" == "setup-mlx" || "$use_mlx" == true ]]; then
   env_python="$PWD/.venv-mlx-cpu/bin/python"
 fi
 if [[ "${1:-}" == "setup-mlx" ]]; then

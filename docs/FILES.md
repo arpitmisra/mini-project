@@ -9,6 +9,7 @@ The default is pretrained extraction. The historical package name contains `mlx`
 | `src/oct_dinov2_mlx/dashboard.py` | Offline clickable HTML dashboard with embedded crop and arrays. |
 | `src/oct_dinov2_mlx/lora.py` | MLX query/value low-rank adapters and native merged-weight export. |
 | `tests/test_inspection.py`, `tests/test_lora.py` | Relationship/normalization semantics and adapter update/freeze/merge checks. |
+| `tests/test_shell_wrapper.py` | Actual Bash environment selection and argument preservation, including paths with spaces. |
 | `docs/RESEARCH_WORKFLOW.md` | End-to-end dashboard and adaptation research runbook. |
 | `docs/RESEARCH_VALIDATION.md` | Local test evidence and limits for the research workflow. |
 | `oct.sh` | Mac setup/test/run/show wrapper; manages .venv-dense without manual activation. |
